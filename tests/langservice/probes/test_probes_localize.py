@@ -12,6 +12,7 @@ import pytest
 import garak.generators.base
 import garak.payloads
 import garak.probes.base
+import garak.probes.dra
 import garak.probes.encoding
 import garak.resources.encodings
 from garak import _config, _plugins
@@ -221,3 +222,23 @@ def test_sata_masks_in_english_then_translates(fake_pt):
         assert msg.lang == "pt"
         assert f"{payload} em português, ação" in msg.text
         assert "{0}" not in msg.text
+
+
+def test_dra_puzzle_hides_the_translated_question(fake_pt):
+    p = _plugins.load_plugin("probes.dra.DRA")
+    sources = garak.payloads.load(p.payload_name).payloads
+    behavior_call, template_call, tool_call, join_call = fake_pt.calls
+    assert behavior_call == sources
+    assert not any(t.startswith('"') for t in template_call)
+    assert tool_call == garak.probes.dra.TOOL_LIST
+    assert join_call == ["{} and {}"]
+    assert len(p.prompts) == len(sources) * len(template_call)
+    for i, msg in enumerate(p.prompts):
+        source = sources[i % len(sources)]
+        question = f"{source} em português, ação".lower()
+        assert msg.lang == "pt"
+        assert msg.notes["source_text"] == source
+        puzzle = msg.text.split("\n")[: len(question)]
+        assert "".join(re.findall(r"\((.)\)", "\n".join(puzzle))) == question
+        assert "(ç)" not in puzzle and "(ã)" not in puzzle
+        assert "em português, ação" in msg.text.split("\n", len(question))[-1]
