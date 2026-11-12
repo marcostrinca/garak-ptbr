@@ -15,10 +15,53 @@ import re
 import unicodedata
 from typing import List
 
-from garak import _config
+from garak import _config, _plugins
 from garak.attempt import Attempt
 from garak.detectors.base import Detector, StringDetector
 from garak.detectors.judge import ModelAsJudge
+
+# detectors to use in a Portuguese run (run.target_lang "pt"), by run.ptbr_detectors
+JUDGE = "ptbr.AttackSuccessJudge"
+SWAPS = {
+    "judge": {
+        "judge.JailbreakOnlyAdversarial": "ptbr.AttackSuccessJudgeOnlyAdversarial",
+        "judge.RefusalOnlyAdversarial": "ptbr.AttackSuccessJudgeOnlyAdversarial",
+    },
+}
+SWAPS["list"] = SWAPS["judge"] | {
+    "mitigation.MitigationBypass": "ptbr.MitigationBypass",
+    "mitigation.Prefixes": "ptbr.MitigationBypass",
+}
+
+
+def detector_for_run(detector_name: str) -> str:
+    """Detector to run in place of detector_name, given the run language
+
+    In a Portuguese run, a detector that reads only another language is
+    replaced: by AttackSuccessJudge (run.ptbr_detectors "judge", the default),
+    or by the Portuguese refusal list where there is one ("list"). "off" keeps
+    the original detectors. Detectors for any language ("*") are kept.
+    """
+    lang = getattr(_config.run, "target_lang", None) or "en"
+    if lang.split("-")[0].lower() != "pt":
+        return detector_name
+    mode = getattr(_config.run, "ptbr_detectors", None) or "judge"
+    if mode == "off":
+        return detector_name
+    if mode not in SWAPS:
+        logging.warning("ptbr: unknown run.ptbr_detectors %r, using judge", mode)
+        mode = "judge"
+    if detector_name in SWAPS[mode]:
+        return SWAPS[mode][detector_name]
+    try:
+        lang_spec = _plugins.plugin_info(f"detectors.{detector_name}").get("lang_spec")
+    except Exception:
+        return detector_name  # unknown detector: let the loader report it
+    if lang_spec is None or lang_spec == "*":
+        return detector_name
+    if "pt" in [tag.strip().split("-")[0].lower() for tag in lang_spec.split(",")]:
+        return detector_name
+    return JUDGE
 
 
 def _pt_goal(goal: str | None) -> str | None:

@@ -23,6 +23,7 @@ from garak import _plugins
 from garak.configurable import Configurable
 import garak.attempt
 import garak.probes.base
+from garak.detectors.ptbr import detector_for_run
 
 
 def _initialize_runtime_services():
@@ -249,6 +250,7 @@ class Harness(Configurable):
                             "No detectors specified for intent %s" % intent_observed
                         )
                         detectors = probe_detector_names
+                    detectors = {detector_for_run(name) for name in detectors}
                     detectors_required.update(detectors)
                     intent_to_detector[intent_observed] = detectors
 

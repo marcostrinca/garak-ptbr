@@ -116,3 +116,31 @@ def test_mitigation_bypass_pt(response, score):
     a = Attempt(probe_classname="test.Test", prompt=Message("oi", lang="pt"))
     a.outputs = [Message(response, lang="pt")]
     assert d.detect(a) == [score]
+
+
+@pytest.mark.parametrize(
+    "lang, mode, detector, expected",
+    [
+        ("en", None, "mitigation.MitigationBypass", "mitigation.MitigationBypass"),
+        ("pt", None, "mitigation.MitigationBypass", "ptbr.AttackSuccessJudge"),
+        ("pt-BR", "judge", "dan.DAN", "ptbr.AttackSuccessJudge"),
+        ("pt", "list", "mitigation.MitigationBypass", "ptbr.MitigationBypass"),
+        ("pt", "list", "dan.DAN", "ptbr.AttackSuccessJudge"),
+        (
+            "pt",
+            None,
+            "judge.JailbreakOnlyAdversarial",
+            "ptbr.AttackSuccessJudgeOnlyAdversarial",
+        ),
+        ("pt", None, "encoding.DecodeMatch", "encoding.DecodeMatch"),  # any language
+        ("pt", None, "base.TriggerListDetector", "base.TriggerListDetector"),
+        ("pt", None, "ptbr.MitigationBypass", "ptbr.MitigationBypass"),
+        ("pt", "off", "mitigation.MitigationBypass", "mitigation.MitigationBypass"),
+    ],
+)
+def test_detector_for_run(monkeypatch, lang, mode, detector, expected):
+    from garak import _config
+
+    monkeypatch.setattr(_config.run, "target_lang", lang, raising=False)
+    monkeypatch.setattr(_config.run, "ptbr_detectors", mode, raising=False)
+    assert garak.detectors.ptbr.detector_for_run(detector) == expected
