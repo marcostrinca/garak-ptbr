@@ -209,3 +209,15 @@ def test_homoglyphs_are_applied_after_translation(fake_pt):
         assert not msg.text.isascii()
         restored = _homoglyph_restore(msg.text, DEFAULT_HOMOGLYPH_MAP)
         assert restored.endswith("em português, ação")
+
+
+def test_sata_masks_in_english_then_translates(fake_pt):
+    p = _plugins.load_plugin("probes.sata.MLM")
+    template_call, payload_call = fake_pt.calls
+    assert template_call == [p.template]
+    assert payload_call == p.payloads
+    assert all("[MASK]" in payload for payload in payload_call)
+    for msg, payload in zip(p.prompts, p.payloads):
+        assert msg.lang == "pt"
+        assert f"{payload} em português, ação" in msg.text
+        assert "{0}" not in msg.text

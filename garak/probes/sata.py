@@ -110,9 +110,9 @@ class MLM(garak.probes.Probe):
     strings in lieu of using an LLM as in the reference implementation by
     Dong et al.
 
-    Note that due to the use of NLTK and the specific string `[MASK]`, this
-    probe is not well-suited to automatic translation and should be considered
-    English-only at this time.
+    Masking uses NLTK's English part-of-speech tagger, so it runs on the English
+    payloads; when the run translates, the masked payloads and the template are
+    translated afterwards, with the `[MASK]` placeholders kept in place.
     """
 
     lang = "en"
@@ -167,4 +167,15 @@ class MLM(garak.probes.Probe):
         self.payloads = _nltk_mask_payloads(
             payloads=self.payloads, n=self.n_replacements
         )
-        self.prompts = [self.template.format(payload) for payload in self.payloads]
+        if self._localizing():
+            template = self._localize([self.template])[0]
+            self.prompts = [
+                self._localized_message(
+                    template.replace("{0}", localized), self.template.format(payload)
+                )
+                for payload, localized in zip(
+                    self.payloads, self._localize(self.payloads)
+                )
+            ]
+        else:
+            self.prompts = [self.template.format(payload) for payload in self.payloads]
