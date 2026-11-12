@@ -22,9 +22,21 @@ Config (`run.langproviders`): `language: "en,pt"`, `model_type: "llm.LLMTranslat
 `model_config` do gerador (ex.: `generator: nim.NVOpenAIChat`, `uri`, `stop: null` para modelo com raciocínio).
 Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas numa amostra; o Ultra recusou 10%).
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
-(chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: encoding, latentinjection,
-promptinject, smuggling e goodside (frase-gatilho e payload dependem de outros passos do plano).
+(chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection e promptinject
+(frase-gatilho, passo 4 do plano).
 A API da NVIDIA devolve muito 429 com várias rodadas em paralelo.
+
+## Traduzir antes de transformar (`Probe._localize`)
+Probe que codifica, perturba ou disfarça o payload não pode ter o prompt pronto traduzido. Ele traduz os textos
+limpos com `self._localize(textos)`, monta o prompt e embrulha com `self._localized_message(texto, original_en)`;
+o `probe()` não traduz de novo Message já na língua-alvo e o relatório guarda o inglês em `notes["source_text"]`.
+Só payload do tipo `Text` é traduzido (código e marcadores ficam). Famílias cobertas: encoding, badchars,
+smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag.
+- Codificação que só cobre ASCII (ROT13, Morse, Braille, Tag etc.) recebe o texto sem acento
+  (`garak.resources.encodings.ascii_fold`); a lista de gatilhos leva a forma traduzida e a sem acento.
+- dra: `data/dra/letter_map_<lang>.json` e `moderation_cache_<lang>.json` opcionais (pt já existe).
+- O tradutor não traduz trechos entre crases: templates com crase (dra) foram revisados à mão no cache.
+- Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Testar
 Rodar só os testes da área mexida, não a suíte toda. Ex.:
@@ -34,6 +46,8 @@ Precisa dos extras `tests` do pyproject. Testes que baixam arquivo falham atrás
 ## Armadilhas
 - Rodar contra agente de cliente pode criar dado real no cliente (carrinho, pedido). Conferir no código do alvo antes.
 - Não colocar nome, prompt ou dado de cliente neste repo.
+- `tests/langservice/probes/test_probes_goodside.py::test_Tag_attempt_descrs_translation` falha também no
+  garak original (JSONDecodeError em `_convert_json_string`); não é regressão.
 
 ---
 
