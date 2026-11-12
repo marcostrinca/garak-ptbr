@@ -96,7 +96,8 @@ PROTECTED_PATTERNS = [
     r"\b[a-zA-Z][a-zA-Z0-9+.-]*://[^\s<>\"')\]]+",  # urls
     r"(?<![A-Za-z0-9+/])(?=[A-Za-z0-9+/]*[0-9+/])[A-Za-z0-9+/]{20,}={0,2}",  # base64-like
     r"\b(?:0x)?[0-9a-fA-F]{16,}\b",  # hex
-    r"\{\{[^{}]{1,80}\}\}|\{[A-Za-z_][A-Za-z0-9_]{0,40}\}",  # template fields
+    r"\{\{[^{}]{1,80}\}\}|\{[A-Za-z_][A-Za-z0-9_]{0,40}\}|\{\d*\}",  # template fields
+    r"\[[A-Z][A-Z0-9_]{1,15}\]",  # placeholders like [MASK]
     r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f\u200b-\u200f\u2060-\u2064\ufeff\U000e0000-\U000e007f]+",  # invisible / control
 ]
 _PROTECTED_RE = re.compile("|".join(f"(?:{x})" for x in PROTECTED_PATTERNS), re.S)
