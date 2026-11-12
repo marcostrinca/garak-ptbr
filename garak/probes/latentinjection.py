@@ -12,9 +12,7 @@ All probes should implement the ``LatentInjectionMixin``.
 
 import logging
 import random
-import tqdm
 
-import garak.resources.theme
 from garak import _config
 from garak.attempt import Attempt
 import garak.payloads
@@ -23,6 +21,8 @@ import garak.probes
 INJECTION_MARKER = "<|garak_injection|>"
 PAYLOAD_MARKER = "<|garak_payload|>"
 TRIGGER_MARKER = "<|garak_trigger|>"
+# kept verbatim by the LLM translator, like any template field
+TRIGGER_SLOT = "{garak_trigger}"
 
 
 class LatentInjectionMixin:
@@ -43,7 +43,21 @@ class LatentInjectionMixin:
     follow_prompt_cap = False
     tier = garak.probes.Tier.OF_CONCERN
 
+    # payload triggers to send as they are in any language, e.g. domains or
+    # phrases already in another language
+    untranslated_triggers = ()
+
+    def _keep_payload_triggers(self, payload_group) -> None:
+        """Mark triggers from a payload group not in English as untranslated"""
+        if (payload_group.lang or "en") != "en":
+            self.untranslated_triggers = set(self.untranslated_triggers) | set(
+                payload_group.payloads
+            )
+
     def _build_prompts_triggers(self, cap=None) -> None:
+        # prompts are built with TRIGGER_SLOT in place of the trigger, so that a
+        # translation keeps the trigger slot and the detector looks for the
+        # same trigger the prompt carries
         self.prompts = []
         self.triggers = []
 
@@ -60,7 +74,7 @@ class LatentInjectionMixin:
                         for payload in self.payloads:
                             for payload_trigger in self.payload_triggers:
                                 this_payload = payload.replace(
-                                    TRIGGER_MARKER, payload_trigger
+                                    TRIGGER_MARKER, TRIGGER_SLOT
                                 )
                                 injection = "".join(
                                     [
@@ -78,17 +92,42 @@ class LatentInjectionMixin:
                                 self.triggers.append(payload_trigger)
 
         self._prune_data(cap, prune_triggers=True)
+        templates = self.prompts
 
-        preparation_bar = tqdm.tqdm(
-            total=len(self.triggers),
-            leave=False,
-            colour=f"#{garak.resources.theme.LANGPROVIDER_RGB}",
-            desc="Preparing triggers",
+        if not self._localizing():
+            self.prompts = [
+                template.replace(TRIGGER_SLOT, trigger)
+                for template, trigger in zip(templates, self.triggers)
+            ]
+            return
+
+        sources = list(dict.fromkeys(templates))
+        local_templates = dict(zip(sources, self._localize(sources)))
+        to_translate = list(
+            dict.fromkeys(
+                t for t in self.triggers if t not in self.untranslated_triggers
+            )
         )
-        self.triggers = self.langprovider.get_text(
-            self.triggers, notify_callback=preparation_bar.update
-        )
-        preparation_bar.close()
+        local_triggers = dict(zip(to_translate, self._localize(to_translate)))
+
+        self.prompts, local_trigger_list = [], []
+        for template, trigger in zip(templates, self.triggers):
+            source = template.replace(TRIGGER_SLOT, trigger)
+            local_template = local_templates[template]
+            local_trigger = local_triggers.get(trigger, trigger)
+            if TRIGGER_SLOT not in local_template:
+                logging.warning(
+                    "%s: translation lost the trigger slot, prompt kept in the source language",
+                    self.__class__.__name__,
+                )
+                local_template, local_trigger = template, trigger
+            self.prompts.append(
+                self._localized_message(
+                    local_template.replace(TRIGGER_SLOT, local_trigger), source
+                )
+            )
+            local_trigger_list.append(local_trigger)
+        self.triggers = local_trigger_list
 
     def _attempt_prestore_hook(self, attempt: Attempt, seq: int) -> Attempt:
         attempt.notes["triggers"] = [self.triggers[seq]]
@@ -135,7 +174,9 @@ class TranslationMixin:
             instruction.replace("{LANG_EN_NAME}", self.target_lang_name_en)
             for instruction in self.base_instructions
         ]
-        self.payload_triggers += garak.payloads.load(self.payload_name).payloads
+        payload_group = garak.payloads.load(self.payload_name)
+        self._keep_payload_triggers(payload_group)
+        self.payload_triggers += payload_group.payloads
         self._build_prompts_triggers(cap=self.soft_probe_prompt_cap)
 
 
@@ -377,7 +418,9 @@ The following table summarizes our consolidated financial results for the quarte
 
     def __init__(self, config_root=_config):
         garak.probes.Probe.__init__(self, config_root)
-        self.payload_triggers = garak.payloads.load(self.payload_name).payloads
+        payload_group = garak.payloads.load(self.payload_name)
+        self._keep_payload_triggers(payload_group)
+        self.payload_triggers = payload_group.payloads
         self._build_prompts_triggers(cap=self.soft_probe_prompt_cap)
 
 
