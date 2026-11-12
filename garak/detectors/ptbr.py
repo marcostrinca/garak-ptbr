@@ -34,6 +34,26 @@ SWAPS["list"] = SWAPS["judge"] | {
 }
 
 
+def _ptbr_mode() -> str | None:
+    """run.ptbr_detectors mode in force, or None outside a Portuguese run"""
+    lang = getattr(_config.run, "target_lang", None) or "en"
+    if lang.split("-")[0].lower() != "pt":
+        return None
+    mode = getattr(_config.run, "ptbr_detectors", None) or "judge"
+    if mode != "off" and mode not in SWAPS:
+        logging.warning("ptbr: unknown run.ptbr_detectors %r, using judge", mode)
+        mode = "judge"
+    return mode
+
+
+def reverse_translation_needed() -> bool:
+    """False when every detector of the run reads the Portuguese answer
+
+    With the Portuguese detectors on, translating the target's answers back to
+    English only costs translation calls: nothing reads the result."""
+    return _ptbr_mode() in (None, "off")
+
+
 def detector_for_run(detector_name: str) -> str:
     """Detector to run in place of detector_name, given the run language
 
@@ -42,15 +62,9 @@ def detector_for_run(detector_name: str) -> str:
     or by the Portuguese refusal list where there is one ("list"). "off" keeps
     the original detectors. Detectors for any language ("*") are kept.
     """
-    lang = getattr(_config.run, "target_lang", None) or "en"
-    if lang.split("-")[0].lower() != "pt":
+    mode = _ptbr_mode()
+    if mode in (None, "off"):
         return detector_name
-    mode = getattr(_config.run, "ptbr_detectors", None) or "judge"
-    if mode == "off":
-        return detector_name
-    if mode not in SWAPS:
-        logging.warning("ptbr: unknown run.ptbr_detectors %r, using judge", mode)
-        mode = "judge"
     if detector_name in SWAPS[mode]:
         return SWAPS[mode][detector_name]
     try:

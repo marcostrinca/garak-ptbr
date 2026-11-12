@@ -144,3 +144,24 @@ def test_detector_for_run(monkeypatch, lang, mode, detector, expected):
     monkeypatch.setattr(_config.run, "target_lang", lang, raising=False)
     monkeypatch.setattr(_config.run, "ptbr_detectors", mode, raising=False)
     assert garak.detectors.ptbr.detector_for_run(detector) == expected
+
+
+@pytest.mark.parametrize("mode, translated", [(None, False), ("off", True)])
+def test_reverse_translation_only_when_a_detector_needs_it(
+    monkeypatch, mocker, mode, translated
+):
+    from garak import _config, _plugins
+
+    probe = _plugins.load_plugin("probes.test.Blank")
+    monkeypatch.setattr(_config.run, "target_lang", "pt", raising=False)
+    monkeypatch.setattr(_config.run, "ptbr_detectors", mode, raising=False)
+    probe.reverse_langprovider = mocker.Mock()
+    probe.reverse_langprovider.target_lang = "en"
+    probe.reverse_langprovider.get_text.return_value = ["I can't help."]
+    a = Attempt(probe_classname="test.Blank", prompt=Message("oi", lang="pt"))
+    a.outputs = [Message("Não posso ajudar.")]
+
+    processed = probe._postprocess_attempt(a)
+
+    assert probe.reverse_langprovider.get_text.called == translated
+    assert processed.outputs[0].lang == "pt"
