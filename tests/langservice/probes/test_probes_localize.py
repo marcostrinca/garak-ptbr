@@ -10,6 +10,7 @@ import tempfile
 import pytest
 
 import garak.generators.base
+import garak.payloads
 import garak.probes.base
 import garak.probes.encoding
 import garak.resources.encodings
@@ -175,3 +176,23 @@ def test_ascii_fold():
     fold = garak.resources.encodings.ascii_fold
     assert fold("Ação – “não”… pão") == 'Acao - "nao"... pao'
     assert fold("plain ASCII") == "plain ASCII"
+
+
+def test_badchars_perturbs_the_translated_payload(fake_pt):
+    p = _plugins.load_plugin("probes.badchars.BadCharacters")
+    sources = list(garak.payloads.load("harmful_behaviors").payloads)
+    assert fake_pt.calls == [sources], "only the clean payloads are translated"
+
+    invisible = [
+        c for c in p.prompts if c.notes["bad_character_category"] == "invisible"
+    ]
+    assert invisible
+    for conv in invisible:
+        msg = conv.last_message()
+        assert msg.lang == "pt"
+        visible = "".join(ch for ch in msg.text if ch.isprintable())
+        assert visible.endswith("em português, ação")
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+    assert len(fake_pt.calls) == 1, "perturbed prompts must not be translated again"
+    assert attempts[0].notes["pre_translation_prompt"].last_message().text in sources
