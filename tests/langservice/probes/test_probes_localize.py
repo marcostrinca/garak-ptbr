@@ -196,3 +196,16 @@ def test_badchars_perturbs_the_translated_payload(fake_pt):
     attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
     assert len(fake_pt.calls) == 1, "perturbed prompts must not be translated again"
     assert attempts[0].notes["pre_translation_prompt"].last_message().text in sources
+
+
+def test_homoglyphs_are_applied_after_translation(fake_pt):
+    from garak.probes.smuggling import DEFAULT_HOMOGLYPH_MAP, _homoglyph_restore
+
+    p = _plugins.load_plugin("probes.smuggling.HomoglyphObfuscation")
+    sent = fake_pt.calls[0]
+    assert all(t.isascii() for t in sent), "translator gets the clean text"
+    for msg in p.prompts:
+        assert msg.lang == "pt"
+        assert not msg.text.isascii()
+        restored = _homoglyph_restore(msg.text, DEFAULT_HOMOGLYPH_MAP)
+        assert restored.endswith("em português, ação")
