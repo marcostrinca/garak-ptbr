@@ -6,13 +6,25 @@ antes de codificar, detectores em pt-BR, conteúdo brasileiro e calibração por
 
 ## Branches
 - `main`: garak v0.17.1 sem mudança, mais o que já foi aprovado. Não commitar direto; branch `<nome>/<slug>`.
-- Nada aqui dispara deploy. Actions herdados do garak estão ligados: não rodar workflow sem pedir.
+- Nada aqui dispara deploy. Actions está desligado no repo: não religar nem rodar workflow sem pedir.
 
 ## Correções de fora já aplicadas (cherry-pick -x, autoria preservada)
 - NVIDIA/garak PR #2334 (issue #2329): tradução preserva maiúsculas, pontuação e estrutura.
 - NVIDIA/garak #2305 (já no main deles, pós-0.17.1): pré-requisito do #2309.
 - NVIDIA/garak PR #2309 (issue #2307): frase-gatilho do promptinject traduzida.
 Ao atualizar a base do garak, conferir se esses PRs entraram lá e remover os cherry-picks.
+
+## Tradutor pt-BR (`langproviders.llm.LLMTranslator`)
+Base: NVIDIA/garak PR #1774 (cherry-pick -x), reescrito aqui. Traduz o prompt inteiro numa chamada; código, links,
+base64, hex, HTML e caracteres invisíveis vão mascarados (⟦n⟧) e voltam intactos. Resposta com recusa, sem tradução,
+em outra língua ou de tamanho estranho é rejeitada; depois de `max_retries`, fica o original e entra em `failures`.
+Config (`run.langproviders`): `language: "en,pt"`, `model_type: "llm.LLMTranslator"`, `model_name`,
+`model_config` do gerador (ex.: `generator: nim.NVOpenAIChat`, `uri`, `stop: null` para modelo com raciocínio).
+Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas numa amostra; o Ultra recusou 10%).
+Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
+(chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: encoding, latentinjection,
+promptinject, smuggling e goodside (frase-gatilho e payload dependem de outros passos do plano).
+A API da NVIDIA devolve muito 429 com várias rodadas em paralelo.
 
 ## Testar
 Rodar só os testes da área mexida, não a suíte toda. Ex.:

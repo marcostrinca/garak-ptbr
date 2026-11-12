@@ -484,3 +484,15 @@ class TestLLMTranslatorCache:
         tr._reviewed[tr._cache_key(src)] = {"src": src, "tgt": "Olá, mundo todo"}
         assert tr.get_text([src]) == ["Olá, mundo todo"]
         assert calls == []
+
+    def test_shipped_reviewed_translations_are_found(self, tmp_path):
+        # an entry edited by hand without recomputing its key would never be used
+        gen, calls = _fake_model(lambda t: "tradução da máquina")
+        tr = _translator(
+            gen, {"cache": True, "cache_path": str(tmp_path / "en-pt.json")}
+        )
+        assert tr._reviewed
+        sources = [entry["src"] for entry in tr._reviewed.values()]
+        expected = [entry["tgt"] for entry in tr._reviewed.values()]
+        assert tr.get_text(sources) == expected
+        assert calls == []
