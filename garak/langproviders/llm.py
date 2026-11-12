@@ -16,6 +16,8 @@ from typing import List, Callable
 
 from garak import _config, _plugins
 from garak.attempt import Conversation, Turn, Message
+from langdetect import DetectorFactory, LangDetectException, detect
+
 from garak.exception import GarakException
 from garak.langproviders.base import LangProvider, _initialize_words
 
@@ -103,7 +105,7 @@ _MARKER_RE = re.compile(r"\u27e6(\d+)\u27e7")
 # A translator model that refuses answers with one of these, in either language,
 # instead of a translation.
 _REFUSAL_RE = re.compile(
-    r"^\W*(i('m| am) sorry|sorry, |i can(no|')t|i won't|i'm unable|i am unable|as an ai"
+    r"^\W*(i(['’]m| am) (sorry|not able|unable)|sorry, |i can(no|['’])t|i won['’]t|as an ai"
     r"|desculpe|sinto muito|n[ãa]o posso|n[ãa]o consigo|lamento)",
     re.I,
 )
@@ -333,9 +335,30 @@ class LLMTranslator(LangProvider):
             return "refusal"
         if answer == source and self.source_lang != self.target_lang:
             return "untranslated"
+        if self._wrong_language(answer) and not self._mostly_kept(source, answer):
+            return "wrong language"
         if len(source) > 40 and not 0.3 < len(answer) / len(source) < 3.5:
             return "length"
         return None
+
+    def _wrong_language(self, answer: str) -> bool:
+        """True when a long enough answer is clearly not in the target language."""
+        plain = _MARKER_RE.sub(" ", answer)
+        if len(plain.split()) < 8:
+            return False
+        try:
+            DetectorFactory.seed = 0
+            return detect(plain) != self.target_lang.split("-")[0]
+        except LangDetectException:
+            return False
+
+    @staticmethod
+    def _mostly_kept(source: str, answer: str) -> bool:
+        """True when most answer words come from the source: names, code words
+        or spelled-out payloads that stay as they are in any language."""
+        words = answer.lower().split()
+        kept = set(source.lower().split())
+        return sum(w in kept for w in words) > 0.5 * len(words)
 
     def translate_checked(self, text: str) -> tuple[str, str | None]:
         """Translate ``text``. Returns (translation, None) or (text, reason it failed)."""
