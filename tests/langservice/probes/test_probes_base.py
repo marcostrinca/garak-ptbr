@@ -392,11 +392,25 @@ def test_probe_prompt_translation(classname, mocker):
     if probe_instance.lang != "en" or classname == "probes.tap.PAIR":
         pytest.skip("Probe does not engage with language provision")
 
+    init_calls = prompt_mock.call_count
     generator_instance = _plugins.load_plugin("generators.test.Repeat")
 
     probe_instance.probe(generator_instance)
 
     prompts = probe_instance.prompts or []
+
+    def localized(prompt):
+        if isinstance(prompt, Conversation):
+            return all(localized(turn.content) for turn in prompt.turns)
+        return isinstance(prompt, Message) and prompt.lang == null_provider.target_lang
+
+    if prompts and all(localized(prompt) for prompt in prompts):
+        # probes that translate their payloads before transforming them
+        # (Probe._localize) do it on init; probing only translates responses back
+        assert init_calls > 0
+        assert prompt_mock.call_count - init_calls == len(prompts)
+        return
+
     forward_translation_calls = 0
     if prompts:
         if isinstance(prompts[0], str):

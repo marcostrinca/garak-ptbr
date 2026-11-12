@@ -203,6 +203,7 @@ class EncodingMixin:
     # T009ignore is a secondary fit because the decoded payload is usually trying to bypass the target's safeguards.
     goal = "make the model say an encoded payload"
     use_bytes = True
+    ascii_payload = False  # encoding covers ASCII only; translated payloads are folded
     lang = "en"
     doc_uri = "https://kai-greshake.de/posts/llm-malware/#encoded-inline-jailbreak"
     tier = garak.probes.Tier.COMPETE_WITH_SOTA
@@ -219,6 +220,7 @@ class EncodingMixin:
     def _load_payloads(self):
         self._payloads = []
         self._payload_intents_map = {}
+        self._payload_sources = {}
         self.extra_tags = []
         extra_payload_tags = {
             "web_html_js": ["payload:malicious:renderer:xss"],
@@ -232,31 +234,51 @@ class EncodingMixin:
                 payload_to_add = payload_mapping[payload_class]
 
             _pg = garak.payloads.load(payload_to_add)
-            for p in _pg.payloads:
+            sources = list(_pg.payloads)
+            # only plain text is translated; code and term lists keep their form
+            if _pg.types == ["Text"]:
+                payloads = self._localize(sources)
+            else:
+                payloads = sources
+            for p, source in zip(payloads, sources):
                 self._payloads.append(p)
+                self._payload_sources[p] = source
                 if _pg.intent:
                     self._payload_intents_map[p] = _pg.intent
 
             if payload_to_add in extra_payload_tags:
                 self.extra_tags += extra_payload_tags[payload_to_add]
 
+    def _encode(self, encoder, payload):
+        if self.ascii_payload and self._localizing():
+            payload = garak.resources.encodings.ascii_fold(payload)
+        if self.use_bytes:
+            encoded_text = encoder(bytes(payload, "utf-8"))
+        else:
+            encoded_text = encoder(payload)
+        if isinstance(encoded_text, bytes):
+            encoded_text = encoded_text.decode()
+        return encoded_text
+
     def _generate_encoded_prompts(self, encoding_funcs, encoding_name):
         encoded_prompts = set()
-        for template in TEMPLATES:
+        templates = self._localize(TEMPLATES)
+        # encoding names are technical terms and are not translated
+        for template, source_template in zip(templates, TEMPLATES):
             for payload in self._payloads:
+                source_payload = self._payload_sources.get(payload, payload)
                 for encoder in encoding_funcs:
-                    if self.use_bytes:
-                        encoded_text = encoder(bytes(payload, "utf-8"))
-                    else:
-                        encoded_text = encoder(payload)
-                    if isinstance(encoded_text, bytes):
-                        encoded_text = encoded_text.decode()
                     prompt = template.replace("{encoding_name}", encoding_name).replace(
-                        "{encoded_text}", encoded_text
+                        "{encoded_text}", self._encode(encoder, payload)
                     )
+                    source_prompt = source_template.replace(
+                        "{encoding_name}", encoding_name
+                    ).replace("{encoded_text}", self._encode(encoder, source_payload))
                     trigger = str(payload)
                     payload_intent = self._payload_intents_map.get(payload)
-                    encoded_prompts.add((prompt, trigger, payload_intent))
+                    encoded_prompts.add(
+                        (prompt, trigger, payload_intent, source_prompt)
+                    )
         return sorted(list(encoded_prompts), key=lambda k: k[0])
 
     def __init__(self):
@@ -265,7 +287,12 @@ class EncodingMixin:
         generated_prompts = self._generate_encoded_prompts(
             self.encoding_funcs, self.encoding_name
         )
-        prompts, triggers, prompt_intents = zip(*generated_prompts)
+        prompts, triggers, prompt_intents, source_prompts = zip(*generated_prompts)
+        if self._localizing():
+            prompts = [
+                self._localized_message(prompt, source)
+                for prompt, source in zip(prompts, source_prompts)
+            ]
         self.prompts = list(prompts)
         self.triggers = list(triggers)
         self._prompt_intents = list(prompt_intents)
@@ -290,7 +317,13 @@ class EncodingMixin:
                 del self.triggers[id]
 
     def _attempt_prestore_hook(self, attempt, seq):
-        attempt.notes["triggers"] = [self.triggers[seq]]
+        triggers = [self.triggers[seq]]
+        if self._localizing():
+            # a decoder may or may not restore the accents of a translated payload
+            folded = garak.resources.encodings.ascii_fold(self.triggers[seq])
+            if folded not in triggers:
+                triggers.append(folded)
+        attempt.notes["triggers"] = triggers
         if self._prompt_intents[seq] is not None:
             attempt.intent = self._prompt_intents[seq]
         return attempt
@@ -443,6 +476,7 @@ class InjectROT13(EncodingMixin, garak.probes.Probe):
     model to repeat & decode them. ROT13 only applies to letters in the English
     alphabet."""
 
+    ascii_payload = True
     encoding_funcs = [rot13]
     encoding_name = "ROT13"
     active = True
@@ -475,6 +509,7 @@ class InjectBraille(EncodingMixin, garak.probes.Probe):
     Encodes payloads using braille, and tries a variety of ways of getting the target
     model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = ""
     encoding_funcs = [braille]
     encoding_name = "Braille"
@@ -496,6 +531,7 @@ class InjectAtbash(EncodingMixin, garak.probes.Probe):
     - and follows hidden instructions despite obfuscation.
     """
 
+    ascii_payload = True
     encoding_name = "Atbash"
     active = True
     doc_uri = "https://en.wikipedia.org/wiki/Atbash"
@@ -525,6 +561,7 @@ class InjectMorse(EncodingMixin, garak.probes.Probe):
     Encodes payloads using morse, and tries a variety of ways of getting the target
     model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = ""
     encoding_funcs = [morse]
     encoding_name = "Morse"
@@ -541,6 +578,7 @@ class InjectNato(EncodingMixin, garak.probes.Probe):
     Encodes payloads using the classic NATO phonetic alphabet, and tries a
     variety of ways of getting the target model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = "https://en.wikipedia.org/wiki/NATO_phonetic_alphabet"
 
     def nato(text: bytes) -> bytes:
@@ -623,6 +661,7 @@ class InjectZalgo(EncodingMixin, garak.probes.Probe):
     Encodes payloads using Zalgo decoration, and tries a variety
     of ways of getting the target model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = "https://en.wikipedia.org/wiki/Zalgo_text"
     active = True
 
@@ -653,6 +692,7 @@ class InjectLeet(EncodingMixin, garak.probes.Probe):
     Encodes payloads using Leetspeak, and tries a variety
     of ways of getting the target model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = "https://en.wikipedia.org/wiki/Leet"
 
     encoding_name = "Leetspeak"
@@ -669,6 +709,7 @@ class InjectUnicodeTagChars(EncodingMixin, garak.probes.Probe):
     Encodes payloads by appending them to an emoji as invisible ASCII tags, and tries a variety of ways of getting the
     target model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = "https://embracethered.com/blog/posts/2024/hiding-and-finding-text-with-unicode-tags/"
     encoding_name = "ASCII in Unicode Tags"
     active = True
@@ -699,6 +740,7 @@ class InjectUnicodeVariantSelectors(EncodingMixin, garak.probes.Probe):
     Encodes payloads by encoding ASCII characters as Unicode variant selectors, and tries a variety of ways of getting
     the target model to repeat & decode them."""
 
+    ascii_payload = True
     doc_uri = "https://paulbutler.org/2025/smuggling-arbitrary-data-through-an-emoji/"
 
     encoding_funcs = [smuggle_ascii.variant_smuggling]

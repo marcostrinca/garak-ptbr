@@ -192,9 +192,15 @@ class BadCharacters(garak.probes.Probe):
         self.prompts: List[garak.attempt.Conversation] = []
         self._seen_prompts: set[str] = set()
 
-        for idx, payload in enumerate(self._source_payloads):
+        # translate plain-text payloads before perturbing them, so the
+        # perturbations land on the text the target actually reads
+        if payload_group.types == ["Text"]:
+            payloads = self._localize(self._source_payloads)
+        else:
+            payloads = list(self._source_payloads)
+        for idx, (payload, source) in enumerate(zip(payloads, self._source_payloads)):
             for text, metadata in self._generate_variants(payload, idx):
-                self._append_prompt(text, metadata)
+                self._append_prompt(text, metadata, source)
 
         if not self.prompts:
             raise PluginConfigurationError(
@@ -204,7 +210,7 @@ class BadCharacters(garak.probes.Probe):
 
         self._prune_data()
 
-    def _append_prompt(self, text: str, metadata: dict) -> None:
+    def _append_prompt(self, text: str, metadata: dict, source: str = None) -> None:
         if text in self._seen_prompts:
             return
         self._seen_prompts.add(text)
@@ -212,7 +218,7 @@ class BadCharacters(garak.probes.Probe):
             [
                 garak.attempt.Turn(
                     "user",
-                    garak.attempt.Message(text=text, lang=self.lang),
+                    self._localized_message(text, source or text),
                 )
             ],
             notes=metadata,

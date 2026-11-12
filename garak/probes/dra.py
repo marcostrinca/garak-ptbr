@@ -44,6 +44,7 @@ import garak.probes
 from garak import _config
 import garak.payloads
 from garak.data import path as data_path
+from garak.exception import GarakException
 
 TOOL_LIST = [
     "lots of money",
@@ -146,9 +147,52 @@ class DRA(garak.probes.Probe):
         if _payload_group.intent:
             self._payload_intent = _payload_group.intent
 
+        self.tools = TOOL_LIST
+        self.tool_join = "{} and {}"
+        self._source_texts = {}
+        if self._localizing():
+            self._localize_data(_payload_group.types == ["Text"])
+
         # Generate prompts for each behavior in the dataset
         self.prompts = self._generate_prompts()
         self._prune_data()
+
+    def _localize_data(self, translate_behaviors: bool) -> None:
+        """Translate behaviors, templates and tools before the puzzle is built, so
+        the hidden question, the word hints and the instructions share one language.
+        Optional ``letter_map_<lang>.json`` and ``moderation_cache_<lang>.json``
+        give carrier words and moderation labels for the target language."""
+        target_lang = self.langprovider.target_lang
+        for name, data in (
+            ("letter_map", self.letter_map),
+            ("moderation_cache", self.moderation_cache),
+        ):
+            try:
+                with open(
+                    data_path / "dra" / f"{name}_{target_lang}.json",
+                    encoding="utf-8",
+                ) as f:
+                    data.update(json.load(f))
+            except GarakException:
+                logging.info("dra: no %s for language %s", name, target_lang)
+
+        if translate_behaviors:
+            sources = list(self.all_behaviors)
+            self.all_behaviors = self._localize(sources)
+            self._source_texts = dict(zip(self.all_behaviors, sources))
+
+        # template lines are JSON string literals, translate the text inside
+        decoded = [json.loads(line) for line in self.all_templates]
+        self.all_templates = [
+            json.dumps(text, ensure_ascii=False) for text in self._localize(decoded)
+        ]
+        self.tools = self._localize(TOOL_LIST)
+        self.tool_join = self._localize([self.tool_join])[0]
+
+    def _prompt(self, text: str, question: str):
+        if not self._localizing():
+            return text
+        return self._localized_message(text, self._source_texts.get(question, question))
 
     def _prefix_gen(self, question) -> str:
         """Implements the prefix generation logic for a puzzle-based obfuscation."""
@@ -234,8 +278,8 @@ class DRA(garak.probes.Probe):
                         word_guide += f"`{token[idx:]}` "
         # [2] tool guide
         # naively choose some
-        tools = random.sample(TOOL_LIST, 2)
-        tools = " and ".join(tools)
+        tools = random.sample(self.tools, 2)
+        tools = self.tool_join.format(*tools)
         # [3] fill it
         suffix = template.format(word_guide, tools)
         suffix = suffix.replace("`", '"')
@@ -253,7 +297,7 @@ class DRA(garak.probes.Probe):
                 suffix = self._suffix_gen(question, template)
                 # Concatenate prefix + suffix
                 prompt = prefix + suffix
-                prompts.append(prompt)
+                prompts.append(self._prompt(prompt, question))
 
         logging.info(
             f"DRA probe generated {len(prompts)} prompts using "
@@ -286,6 +330,12 @@ class DRAAdvanced(DRA):
         self.detoxify_model = None
 
         super().__init__(config_root=config_root)
+
+    def _localize_data(self, translate_behaviors: bool) -> None:
+        super()._localize_data(translate_behaviors)
+        source = self.custom_sentence
+        self.custom_sentence = self._localize([source])[0]
+        self._source_texts[self.custom_sentence] = source
 
     def _check_moderation(self, token) -> bool:
         """Check if a token is harmful using detoxify if needed."""
@@ -329,7 +379,7 @@ class DRAAdvanced(DRA):
             suffix = self._suffix_gen(self.custom_sentence, template)
             # Concatenate prefix + suffix
             prompt = prefix + suffix
-            prompts.append(prompt)
+            prompts.append(self._prompt(prompt, self.custom_sentence))
 
         logging.info(
             f"DRAAdvanced probe generated {len(prompts)} prompts using "

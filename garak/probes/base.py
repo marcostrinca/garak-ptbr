@@ -147,6 +147,46 @@ class Probe(Configurable):
             preparation_bar.close()
         self.reverse_langprovider = self._get_reverse_langprovider()
 
+    def _localizing(self) -> bool:
+        """True when this run translates the probe's prompts to another language"""
+        return (
+            self.langprovider is not None and self.langprovider.target_lang != self.lang
+        )
+
+    def _localize(self, texts: List[str]) -> List[str]:
+        """Translate source texts to the run's target language before the probe transforms them.
+
+        Probes that encode, perturb or disguise a payload cannot have the finished
+        prompt translated: the translation would garble the transformed text and the
+        detector would look for the untranslated payload. Such probes translate the
+        plain texts with this method, build their prompts from the result and wrap
+        them with :meth:`_localized_message`, which ``probe()`` does not translate again.
+        Returns the texts unchanged when the run does not translate."""
+        texts = list(texts)
+        if not self._localizing() or not texts:
+            return texts
+        return self.langprovider.get_text(texts)
+
+    def _localized_message(self, text: str, source_text: str) -> garak.attempt.Message:
+        """Message already in the target language, keeping the source text for the report"""
+        if not self._localizing():
+            return garak.attempt.Message(text, lang=self.lang)
+        return garak.attempt.Message(
+            text,
+            lang=self.langprovider.target_lang,
+            notes={"source_text": source_text},
+        )
+
+    @staticmethod
+    def _drop_source_text(msg: garak.attempt.Message):
+        if msg.notes:
+            msg.notes.pop("source_text", None)
+
+    def _restore_source_text(self, msg: garak.attempt.Message):
+        if "source_text" in (msg.notes or {}):
+            msg.text = msg.notes.pop("source_text")
+        msg.lang = self.lang
+
     def _get_langprovider(self):
         from garak.services.langservice import get_langprovider
 
@@ -412,19 +452,28 @@ class Probe(Configurable):
                 )
         else:
             # what types should this expect? Message, Conversation?
+            # messages already in the target language were localized by the probe
+            # before it transformed them (see _localize) and are left as they are
+            target_lang = self.langprovider.target_lang
             for prompt in prompts:
                 if isinstance(prompt, garak.attempt.Message):
-                    prompt.text = self.langprovider.get_text(
-                        [prompt.text], notify_callback=preparation_bar.update
-                    )[0]
-                    prompt.lang = self.langprovider.target_lang
+                    if prompt.lang != target_lang:
+                        prompt.text = self.langprovider.get_text(
+                            [prompt.text], notify_callback=preparation_bar.update
+                        )[0]
+                        prompt.lang = target_lang
+                    else:
+                        self._drop_source_text(prompt)
                 if isinstance(prompt, garak.attempt.Conversation):
                     for turn in prompt.turns:
                         msg = turn.content
+                        if msg.lang == target_lang:
+                            self._drop_source_text(msg)
+                            continue
                         msg.text = self.langprovider.get_text(
                             [msg.text], notify_callback=preparation_bar.update
                         )[0]
-                        msg.lang = self.langprovider.target_lang
+                        msg.lang = target_lang
         lang = self.langprovider.target_lang
         preparation_bar.close()
         for seq, prompt in enumerate(prompts):
@@ -445,15 +494,15 @@ class Probe(Configurable):
                         )
                     }
                 elif isinstance(pre_translation_prompt, garak.attempt.Message):
-                    pre_translation_prompt.lang = self.lang
+                    self._restore_source_text(pre_translation_prompt)
                     notes = {
                         "pre_translation_prompt": garak.attempt.Conversation(
-                            [pre_translation_prompt]
+                            [garak.attempt.Turn("user", pre_translation_prompt)]
                         )
                     }
                 elif isinstance(pre_translation_prompt, garak.attempt.Conversation):
                     for turn in pre_translation_prompt.turns:
-                        turn.content.lang = self.lang
+                        self._restore_source_text(turn.content)
                     notes = {"pre_translation_prompt": pre_translation_prompt}
 
             attempts_todo.append(self._mint_attempt(prompt, seq, notes, lang))

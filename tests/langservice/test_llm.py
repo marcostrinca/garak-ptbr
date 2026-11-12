@@ -419,6 +419,18 @@ class TestLLMTranslatorProtection:
         assert "`rm -rf /tmp/x`" in out
         assert "https://evil" not in calls[0], "protected text must not be sent"
 
+    def test_format_fields_and_mask_placeholders_survive(self):
+        gen, calls = _fake_model(
+            lambda t: "Complete a frase com cuidado, por favor: "
+            + " ".join(re.findall("\u27e6\\d+\u27e7", t))
+        )
+        tr = _translator(gen)
+        out, problem = tr.translate_checked("Fill the [MASK] in {} and {0} now")
+        assert problem is None
+        for kept in ("[MASK]", "{}", "{0}"):
+            assert kept in out
+            assert kept not in calls[0]
+
     def test_whole_prompt_in_one_call(self):
         gen, calls = _fake_model(
             lambda t: "Primeira linha: preparação.\nSegunda linha: o ataque."

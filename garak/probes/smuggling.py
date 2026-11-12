@@ -67,6 +67,15 @@ def _homoglyph_replace(text, glyph_map, seed=None):
     return "".join(out)
 
 
+def _homoglyph_restore(text, glyph_map):
+    """Map homoglyphs from *glyph_map* (and the Latin alpha) back to Latin characters."""
+    latin = {"\u0251": "a"}  # Latin alpha, used in smuggling_homoglyph_5.txt
+    for ch, glyphs in glyph_map.items():
+        for glyph in glyphs:
+            latin[glyph] = ch
+    return "".join(latin.get(ch, ch) for ch in text)
+
+
 class HypotheticalResponse(garak.probes.Probe):
     """HypotheticalResponse probe
 
@@ -146,8 +155,13 @@ class HomoglyphObfuscation(garak.probes.Probe):
 
         # Load payloads from garak's payload system
         source_payloads = []
+        translatable = []
         for payload_name in self.payloads:
-            source_payloads += garak.payloads.load(payload_name).payloads
+            payload_group = garak.payloads.load(payload_name)
+            source_payloads += payload_group.payloads
+            translatable += [payload_group.types == ["Text"]] * len(
+                payload_group.payloads
+            )
 
         # Also load the static prompts as additional payloads
         static_path = data_path / "smuggling_homoglyph_5.txt"
@@ -157,11 +171,28 @@ class HomoglyphObfuscation(garak.probes.Probe):
                     line = line.strip()
                     if line:
                         source_payloads.append(line)
+                        translatable.append(True)
+
+        # Translate the clean text first: translating after the substitution
+        # would garble the payload or normalise the homoglyphs away
+        localized = list(source_payloads)
+        if self._localizing():
+            restore_map = DEFAULT_HOMOGLYPH_MAP | glyph_map
+            to_translate = [i for i, ok in enumerate(translatable) if ok]
+            clean = [
+                _homoglyph_restore(source_payloads[i], restore_map)
+                for i in to_translate
+            ]
+            for i, text in zip(to_translate, self._localize(clean)):
+                localized[i] = text
 
         # Apply homoglyph substitution to each payload
         self.prompts = []
-        for i, payload in enumerate(source_payloads):
-            self.prompts.append(_homoglyph_replace(payload, glyph_map, seed=i))
+        for i, (payload, source) in enumerate(zip(localized, source_payloads)):
+            prompt = _homoglyph_replace(payload, glyph_map, seed=i)
+            if self._localizing():
+                prompt = self._localized_message(prompt, source)
+            self.prompts.append(prompt)
 
 
 class FunctionMasking(garak.probes.Probe):
