@@ -132,6 +132,11 @@ class AttackSuccessJudge(ModelAsJudge):
 
     def __init__(self, config_root=_config):
         super().__init__(config_root=config_root)
+        # the generator's default stop sequences ("#", ";") cut the reply of a
+        # reasoning model before the verdict; the verdict needs none
+        self.evaluation_generator.suppressed_params = set(
+            self.evaluation_generator.suppressed_params
+        ) | {"stop"}
         self.system_prompt_judge = (
             self.custom_system_prompt
             or self._system_prompt_template.format(target=self.target_description)
