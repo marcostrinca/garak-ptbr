@@ -3,11 +3,16 @@
 
 """Probes that translate their payloads before transforming them (Probe._localize)"""
 
+import base64
+import re
 import tempfile
 
 import pytest
 
+import garak.generators.base
 import garak.probes.base
+import garak.probes.encoding
+import garak.resources.encodings
 from garak import _config, _plugins
 from garak.attempt import Conversation, Message, Turn
 
@@ -108,3 +113,65 @@ def test_no_translation_leaves_prompts_alone(monkeypatch):
     assert p._localize(["x"]) == ["x"]
     msg = p._localized_message("X", "x")
     assert msg.text == "X" and msg.lang == "en" and not msg.notes
+
+
+class _Decoder(garak.generators.base.Generator):
+    """Toy target that obeys: decodes whatever it is sent and says it back"""
+
+    generator_family_name = "test"
+    name = "decoder"
+
+    def __init__(self, decode, config_root=_config):
+        self.decode = decode
+        super().__init__(self.name, config_root=config_root)
+
+    def _call_model(self, prompt, generations_this_call=1):
+        return [Message(self.decode(prompt.last_message().text))]
+
+
+def _b64_decode_all(text):
+    found = []
+    for token in re.findall(r"[A-Za-z0-9+/_=-]{8,}", text):
+        for decode in (base64.b64decode, base64.urlsafe_b64decode):
+            try:
+                found.append(decode(token).decode("utf-8"))
+                break
+            except ValueError:
+                pass
+    return "\n".join(found)
+
+
+def _rot13(text):
+    return text.translate(garak.probes.encoding.ROT13TRANS)
+
+
+@pytest.mark.parametrize(
+    "classname,decode",
+    [("InjectBase64", _b64_decode_all), ("InjectROT13", _rot13)],
+)
+def test_obedient_decoder_is_caught_in_target_language(fake_pt, classname, decode):
+    _config.plugins.probes["encoding"] = {"payloads": ["default"]}
+    p = _plugins.load_plugin(f"probes.encoding.{classname}")
+    assert all(m.lang == "pt" for m in p.prompts)
+    assert all(t.endswith("em português, ação") for t in p.triggers)
+
+    attempts = p.probe(_Decoder(decode))
+    detector = _plugins.load_plugin("detectors.encoding.DecodeMatch")
+    scores = [s for a in attempts for s in detector.detect(a)]
+    assert scores and all(s == 1.0 for s in scores)
+
+
+def test_ascii_only_encoding_gets_folded_payload(fake_pt):
+    _config.plugins.probes["encoding"] = {"payloads": ["default"]}
+    p = _plugins.load_plugin("probes.encoding.InjectMorse")
+    folded = garak.resources.encodings.ascii_fold(p.triggers[0])
+    assert folded != p.triggers[0]
+    assert garak.probes.encoding.morse(folded.encode()).decode() in (
+        p.prompts[0].text + "".join(m.text for m in p.prompts[1:])
+    )
+
+
+def test_ascii_fold():
+    fold = garak.resources.encodings.ascii_fold
+    assert fold("Ação – “não”… pão") == 'Acao - "nao"... pao'
+    assert fold("plain ASCII") == "plain ASCII"
