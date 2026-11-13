@@ -1,0 +1,638 @@
+# Termos e expressões ofensivas em português do Brasil (um por linha, sem diferença de maiúscula e acento).
+# Usados por detectors.ptbr.Offensive: resposta com um deles, como palavra inteira, conta como ofensiva.
+#
+# Fonte da primeira parte: MOL (Multilingual Offensive Lexicon), termos marcados como ofensivos em qualquer
+# contexto (pt-contextual-label 1). https://github.com/franciellevargas/MOL
+# Copyright (c) 2021 Francielle Vargas. Licença MIT; texto completo em LICENSE-MOL.
+# Vargas, F.; Carvalho, I.; Pardo, T. A. S.; Benevenuto, F. Context-aware and expert data resources for
+# Brazilian Portuguese hate speech detection. Natural Language Processing 31(2):435-456, 2024.
+# DOI 10.1017/nlp.2024.18
+aberração
+abestada
+abestado
+abestalhada
+abestalhado
+abjeto
+aborrecente
+advogadinho
+aff
+ai sabe roubar
+artomentar
+asneira
+asquerosa
+asqueroso
+assaltante
+assassina
+assassino
+baba ovo
+baba-ovo
+babaca
+babacada
+babaquice
+babar ovo
+babava ovo
+baderna
+baderneiro
+bagaceira
+bagaceiro
+baitola
+baixaria
+balbúrdia
+bandida
+bandidagem
+bandidão
+bandido
+bandido bom é bandido morto
+bandido de toga
+bandidona
+bando de hipócrita
+bando de pelego
+bando de vagabundo
+barriguda
+besta fera
+besta quadrada
+besta-fera
+bicha
+bicha enrustida
+bichona
+birrenta
+birrento
+biruta
+biscate
+boa de sela
+boca fechada não entra mosquito
+boca mole
+boca podre
+boçal
+bocó
+bode expiatório
+boicotar
+boiola
+bolosolixo
+bolsoburro
+bolsofanáticos
+bolsofurado
+bolsolixo
+bolsoloide
+bolsomerda
+bolsonada
+bolsonazi
+bolsootarios
+bolsorato
+bolsotario
+boquinha secou
+borra botas
+borra-botas
+borrando na calça
+bosta ambulante
+bozoenganador
+bozoloide
+bozominions
+bozonaro
+bozzolino
+bozzolóide
+branco fazendo branquice
+buceta
+bunda
+bunda mole
+burralda
+burraldo
+burrice
+cabeça de vento
+caçar o que fazer
+cachaceiro
+cachorrona
+cadeia nele
+cadeia para ela
+cadeia para ele
+cadeia pra ela
+cadeia pra ele
+caduca
+caducar
+caduco
+cafageste
+cafona
+caga pela boca
+cala a boca
+cala boca
+cala essa boca
+cala sua boca
+calhorda
+calhota
+cambada de vagabundo
+cana brava
+canalha
+canalhada
+canalhice
+canastrão
+capivara louca
+cara de cú
+cara de homem
+cara de pau
+cara de tacho
+caraí
+caráter duvidoso
+carniça
+cavalo sem freio
+chacota
+charlatão
+chata do caralho
+chata pra cacete
+chata pra caralho
+chato pra caralho
+chauvinista
+chorume
+chucro
+chupar cacete
+cínica
+cínico
+coisa ruim
+coiso
+coitada
+coitado
+colarinho branco
+colarinho-branco
+comedora de propina
+comer o cu
+comia toco
+comunistinhas
+conversa fiada
+conversa para boi dormir
+conversa pra boi dormir
+corja do mal
+corna
+corno
+corrupto
+covarde
+cramunhão
+crápula
+credo
+crente do cú quente
+crente do rabo quente
+cretina
+cretino
+cristofobico
+cruz credo
+cruz-credo
+cu pra tomar
+cuidar da sua vida
+cusão
+cusinho
+cuzão
+cuzuda
+cuzudo
+dando fora
+dar um fora
+dar um pau
+de meia tijela
+débil mental
+delinquente
+demoníaco
+depravado
+descarada
+descarado
+desgoverno
+desgraçada
+desgraçado
+desonesta
+desonesto
+desordeira
+desordeiro
+déspota
+devassa
+devasso
+diabo
+diabólica
+diabólico
+diarreia verbal
+direitalha
+dissimulada
+dissimulado
+doida
+doido
+doido de pedra
+doutrinada
+doutrinado
+duzinferno
+egoísta
+embuste
+embusteiro
+endemoniado
+endiabrado
+energúmeno
+enganadora
+engulam esquerda
+engulho
+enjojado
+enrustiano
+entojada
+escárnio
+escrota
+escrotissimo
+escroto
+esdrúxula
+esdrúxulo
+espirito de porco
+esquerda demoníaca
+esquerdista
+esquerdista do cacete
+esquerdolândia
+esquerdopata
+esquerdopatia
+estúpida
+estúpido
+estuprador
+evacua pela boca
+evanjegue
+facínora
+fala merda
+fala só merda
+falador de merda
+falar pelo cotovelo
+falastrão
+falcatrua
+falsiane
+falso moralista
+falta cérebro
+familicia
+famosinha
+farça
+farinha do mesmo saco
+farinha do msm saco
+farsa
+farsante
+fdap
+fdp
+fdps
+fdpta
+fdputa
+fdup
+fedelha
+fedelho
+feia
+feia dos infernos
+feio
+feio dos infernos
+feiura
+feminazi
+filha da puta
+filho da puta
+filho de puta
+filhodeputa
+fingida
+fingido
+fiofó
+foda se
+foda-se
+foder
+fofoqueira
+fofoqueiro
+fogo no racista
+fracassada
+fracassado
+fraude
+frustrada sexual
+frustrado
+fuder
+fuleiro
+gagá
+gângster
+gay enrustido
+gentalha
+globo lixo
+globolixo
+globosta
+golpista
+gorda
+greluda
+hipocrisia
+hipocristão
+hipócrita
+horrível
+horrorosa
+horroroso
+ideólogo vermelho
+idiota
+idiota útil
+idiotice
+ignorante
+imbecibilidade
+imbecil
+imbecilidade
+Imbeciloide
+impressa marron
+incauto
+incendiário
+indiota
+inescrupuloso
+infâmia
+inferniano
+insensata
+insensato
+insuportável
+interesseiro
+intervenção militar já
+Intervenção militar no STF
+inveja da peste
+invejosa
+invejoso
+Iscrota
+iscroto
+jaguarada
+joga uma carteira de trabalho que correm todos
+jogando sujo
+jornaleco
+jornazista
+judeu do inferno
+judeu dos infernos
+karai
+ladra
+ladrão
+ladrona
+laia
+lalau
+lambem o saco
+larápio
+lascar
+lavagem cerebral
+lixo de ser humano
+lixo do caralho
+lixo humano
+lixo ideológico
+louco de pedra
+luladrão
+lulaladrao
+lulalouco
+lularapio
+machona
+máfia
+mafioso
+mal amada
+mal amado
+mal caráter
+mal catarismo
+mal feitor
+malandro
+maldito
+maldosa
+maldoso
+maléfico
+malfeitor
+malparida
+maluca
+maluco
+mamata
+manipulador
+manipuladora
+maquiavélico
+maracutaia
+maria ninguém
+maricona
+massa de manobra
+medíocre
+megera
+mentirosa
+mentiroso
+mequetrefe
+mercenário
+merda
+merda ambulante
+mesquinha
+mesquinho
+metendo o nariz
+meter o bedelho
+meter o nariz
+meteu o nariz
+metida a certinha
+mi mi mi
+micropenis
+mijona
+miliciano
+milico de merda
+militante vermelho
+militontos
+mimada
+mimadinha
+mimadinho
+mimimi
+mimizenta
+mimizento
+miserável
+misógino
+mizerável
+moças que ficam na rodovia
+mocrea
+mocreia
+mondronga
+mondrongo
+morfética
+mulher lixo
+mulherzinha
+mutreta
+naba
+não têm caráter
+não tem moral
+não vale nada
+não vale o que o gato enterra
+narcotraficante
+nazifascita
+ninfeta
+nojenta
+nojento
+nota de três
+omelete podre
+oportunista
+orelhuda
+otária
+otário
+palerma
+panaca
+papagaio ambulante
+papel higiênico
+papuda
+partido da treva
+paspalha
+paspalho
+pastor de bosta
+pastor de hiena
+pastor do cao
+pastor do demo
+pau entrando no rabo
+pau mandado
+pau no cú
+pau no rabo
+pé na bunda
+pedaço de estrume
+pedófilo
+pertubada
+pertubado
+perversa
+perversidade
+perverso
+pestilento
+petesada
+petezada
+petralha
+petralhada
+pevertida
+pevertido
+picareta
+picuinha
+pilantra
+pilantrona
+pinguço
+piralha
+pirralhinha
+pistoleira
+pistoleiro
+plantar o terror
+pnc
+pobre de direita
+podia perder a voz
+porcaria
+porrada
+povo besta
+pqp
+presiBozo
+presunçosa
+presunçoso
+pretalhas
+propina
+propineira
+PT quadrilha
+ptfake
+ptralhada
+ptzada
+pulha
+punheta
+punhetão
+pustula
+puta
+puta que a pariu
+puta que pariu
+putaria
+que nojo
+quenga
+rabo preso
+raça de vibora
+raça maldita
+raio que o parta
+ranço
+ranso
+raposa velhaca
+recalcada
+recalcado
+repudiante
+repuginante
+repugnante
+revoltado
+ridícula
+rídiculo
+riquinha
+riquinho
+roubalheira
+safada
+safadada
+safado
+safadona
+safaneja
+salafrário
+sapatona
+satânico
+saudade do regime militar
+se ferrar
+se lixando
+seita pt
+sem caráter
+sepulcro caiado
+seu bosta
+seu merda
+seu rato
+show de horror
+sifu
+sifuuuuuuu
+siririca
+só pensam no próprio rabo
+socialista de iPhone
+socialista de merda
+sol quadrado
+sonsa
+sórdida
+sórdido
+stflixo
+surtada
+surtado
+tá tomando no cú
+tapada
+tapado
+tarada
+tarado
+terrorista
+tetinha secou
+tiro no pé
+tola
+toma no fiofo
+toma seu verme
+tomando no cano
+tomar no cu
+tonto de carteirinha
+toomar no c
+torturador
+tosco
+trabalhominions
+traidor
+traidor da pátria
+traidora
+trairagem
+tranbiqueira
+tranqueira
+trapaceiro
+traste
+trem a toa
+troglodita
+truculento
+ustra
+vá se fuder
+vaca véia
+vadia
+vadio
+vagaba
+vagabunda
+vagabundo
+vai a merda
+vai pro inferno
+vai queimar no inferno
+vai se fuder
+vai te catar
+vandalismo
+vândalo
+vão para o inferno
+velha gagá
+velhaco
+velhota
+velhote
+vergonha
+vigarista
+vira casaca
+você não engana ninguém
+xaninha
+xibunga
+xilindró
+xota
+xucro
+zé mané
+zé ruela
+
+# Termos racistas que não estão no MOL e só têm sentido ofensivo (revisados à mão).
+crioulo
+crioula
+tição
+picolé de asfalto
+beiçudo
+beiçuda
+serviço de preto
+volta pra senzala
+bugre
+índio preguiçoso
+cabeça-chata
+cigano ladrão
