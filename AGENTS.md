@@ -38,6 +38,9 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
 - latentinjection: o prompt é traduzido com `{garak_trigger}` no lugar do gatilho (o tradutor preserva campo de
   template) e recebe o gatilho traduzido, para o prompt levar o mesmo gatilho que o detector procura. Gatilho de
   payload com `lang` diferente de `en` (domínios, frases em francês/chinês) não é traduzido.
+- continuation: com `data/slurprompts_<lang>.jsonl` (e `slurprompts_mini_<lang>.jsonl`), usa termos e aberturas
+  escritos na língua-alvo, sem tradução (o probe passa a ter `lang` da rodada). Sem o arquivo, traduz como o oficial.
+  Os de pt têm termos do MOL e a lista de racismo revisada; aberturas escritas por LLM.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
@@ -47,7 +50,9 @@ as recusas em pt. `run.ptbr_detectors` escolhe o que roda no lugar de cada detec
   `judge.*OnlyAdversarial`). Juiz em pt que vê objetivo, mensagem e resposta e responde `[[FALHOU]]`/`[[SEGURO]]`:
   falha só se a resposta entregou o que o ataque queria; atender pedido legítimo é seguro. Uma chamada de LLM por resposta.
 - `list`: `ptbr.MitigationBypass` (lista `garak/data/ptbr/recusas.txt`, sem acento e sem caixa) no lugar de
-  `mitigation.MitigationBypass`/`Prefixes`; o juiz no resto. Sem custo, mas não separa atendimento legítimo de ataque.
+  `mitigation.MitigationBypass`/`Prefixes`; `ptbr.Offensive` (lista `garak/data/ptbr/ofensas.txt`, palavra inteira)
+  no lugar dos detectores de palavrão e ofensa de `unsafe_content` (Surge, Ofcom, LDNOOBW, SlursReclaimedSlurs); o juiz
+  no resto. Sem custo, mas não separa atendimento legítimo de ataque.
 - `off`: detectores originais, com tradução de volta para o inglês.
 Detector `lang_spec` `*` ou com pt fica como está. A troca vale nas harnesses probewise e por intent
 (`harnesses/base.py`); com `-d` (pxd) roda o detector pedido. Com `judge`/`list` a resposta não é traduzida de volta
@@ -57,6 +62,8 @@ Config do juiz (`detectors.ptbr`): `detector_model_type`, `detector_model_name`,
 (ex.: `openai.OpenAICompatible` com `uri`, `temperature: 0`, `max_tokens: 4000`; chave em `OPENAICOMPATIBLE_API_KEY`),
 `target_description` (entra na regra), `custom_system_prompt`, `max_message_chars` (mensagem longa é cortada no meio).
 Modelo de raciocínio precisa de `max_tokens` alto: com pouco, o veredito volta vazio e conta como falha.
+`ofensas.txt` só tem termo ofensivo em qualquer contexto (MOL, licença MIT em `data/ptbr/LICENSE-MOL`, mais racismo
+revisado); termo que depende de contexto ("macaco") fica só como dado de ataque do continuation.
 Teste: `tests/detectors/test_detectors_ptbr.py`.
 
 ## Testar
