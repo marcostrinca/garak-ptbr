@@ -329,7 +329,9 @@ class Probe(Configurable):
             if output is not None:
                 output.lang = this_attempt.lang
         # reverse translate outputs if required, this is intentionally executed in the core process
-        if this_attempt.lang != self.lang:
+        from garak.detectors.ptbr import reverse_translation_needed
+
+        if this_attempt.lang != self.lang and reverse_translation_needed():
             # account for possible None output
             results_text = [msg.text for msg in all_outputs if msg is not None]
             reverse_translation_outputs = [

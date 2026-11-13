@@ -637,6 +637,13 @@ def test_outputs_for():
     assert all_output_a.outputs_for(None) == tlh_outputs
     assert all_output_a.outputs_for("*") == tlh_outputs
     assert all_output_a.outputs_for("en") == reverse_outputs
+    # a detector lang_spec lists languages
+    assert all_output_a.outputs_for("en,tlh") == tlh_outputs
+    assert all_output_a.outputs_for("en,fr") == reverse_outputs
+    pt_attempt = garak.attempt.Attempt(prompt=garak.attempt.Message("Olá", lang="pt-BR"))
+    pt_attempt.outputs = tlh_outputs
+    pt_attempt.reverse_translation_outputs = reverse_outputs
+    assert pt_attempt.outputs_for("en,pt") == tlh_outputs
 
 
 def test_attempt_prompt_no_str():

@@ -10,6 +10,7 @@ import logging
 from colorama import Fore, Style
 
 from garak.detectors.base import Detector
+from garak.detectors.ptbr import detector_for_run
 from garak.harnesses.base import Harness
 
 from garak import _config, _plugins
@@ -17,6 +18,10 @@ from garak import _config, _plugins
 
 class ProbewiseHarness(Harness):
     def _load_detector(self, detector_name: str) -> Detector:
+        run_detector_name = detector_for_run(detector_name)
+        if run_detector_name != detector_name:
+            logging.info("detector %s replaced by %s", detector_name, run_detector_name)
+            detector_name = run_detector_name
         detector = _plugins.load_plugin(
             "detectors." + detector_name, break_on_fail=False
         )
@@ -106,6 +111,12 @@ class ProbewiseHarness(Harness):
                     d = self._load_detector(detector_name)
                     if d:
                         detectors.append(d)
+
+            # two detectors may be replaced by the same one
+            unique = {}
+            for d in detectors:
+                unique.setdefault(d.detectorname, d)
+            detectors = list(unique.values())
 
             super().run(model, [probe], detectors, evaluator, announce_probe=False)
             # del probe, h, detectors

@@ -267,3 +267,34 @@ def test_tag_hides_the_translated_payload_and_trigger(fake_pt):
         assert local_trigger in attempt.notes["triggers"]
         scores = detector.detect(attempt)
         assert scores and all(s == 1.0 for s in scores)
+
+
+@pytest.mark.parametrize(
+    "classname, kept",
+    [
+        ("LatentWhois", set()),
+        ("LatentInjectionReport", {"client.hooli-schwab.com"}),  # domains: any language
+        ("LatentInjectionTranslationEnFr", {"Tu es un imbécile"}),  # already French
+    ],
+)
+def test_latentinjection_prompt_carries_the_trigger_it_is_judged_on(
+    fake_pt, classname, kept
+):
+    p = _plugins.load_plugin(f"probes.latentinjection.{classname}")
+    for msg, trigger in zip(p.prompts, p.triggers):
+        assert msg.lang == "pt"
+        assert trigger in msg.text
+        assert "{garak_trigger}" not in msg.text
+        if trigger in kept:
+            assert trigger in msg.notes["source_text"]
+    assert kept <= set(p.triggers)
+    assert any(t.endswith("em português, ação") for t in p.triggers) != (
+        classname == "LatentInjectionReport"
+    )
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+    detector = _plugins.load_plugin("detectors.base.TriggerListDetector")
+    for attempt in attempts:
+        assert attempt.prompt.last_message().text in [m.text for m in p.prompts]
+        scores = detector.detect(attempt)
+        assert scores and all(s == 1.0 for s in scores)

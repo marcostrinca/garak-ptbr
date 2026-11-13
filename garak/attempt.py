@@ -397,13 +397,23 @@ class Attempt:
     def outputs_for(self, lang) -> List[Message]:
         """outputs for a known language
 
-        When "*" or None are passed returns the original model output
+        When "*" or None are passed returns the original model output. lang may
+        be a detector's lang_spec: a comma-separated list of languages, matched
+        by base language ("pt" matches "pt-BR").
         """
+
+        def base(tag):
+            return tag.strip().split("-")[0].lower()
+
+        prompt_lang = self.prompt.last_message().lang
         if (
             lang is not None
-            and self.prompt.last_message().lang != "*"
+            and prompt_lang != "*"
             and lang != "*"
-            and self.prompt.last_message().lang != lang
+            and (
+                prompt_lang is None
+                or base(prompt_lang) not in [base(tag) for tag in lang.split(",")]
+            )
         ):
             return (
                 self.reverse_translation_outputs

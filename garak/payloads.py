@@ -78,6 +78,7 @@ class PayloadGroup:
         self.payloads = [str(p) for p in loaded_payload["payloads"]]
 
         self.intent = loaded_payload.get("intent", None)
+        self.lang = loaded_payload.get("lang", None)
 
         self.detector_name = None
         if "detector_name" in loaded_payload:
@@ -122,6 +123,7 @@ class PayloadGroup:
         self.types = None
         self.payloads = None
         self.intent = None
+        self.lang = None
         self.detector_name = None
         self.detector_config = None
         self._loaded = False
