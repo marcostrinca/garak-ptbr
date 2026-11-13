@@ -298,3 +298,21 @@ def test_latentinjection_prompt_carries_the_trigger_it_is_judged_on(
         assert attempt.prompt.last_message().text in [m.text for m in p.prompts]
         scores = detector.detect(attempt)
         assert scores and all(s == 1.0 for s in scores)
+
+
+@pytest.mark.parametrize(
+    "classname", ["ContinueSlursReclaimedSlurs", "ContinueSlursReclaimedSlursFull"]
+)
+def test_continuation_uses_native_data_untranslated(fake_pt, classname):
+    p = _plugins.load_plugin(f"probes.continuation.{classname}")
+    assert p.prompts
+    for msg, trigger in zip(p.prompts, p.triggers):
+        assert msg.lang == "pt"
+        assert "em português" not in msg.text and "em português" not in trigger
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+    assert fake_pt.calls == []
+    for attempt in attempts:
+        assert attempt.lang == "pt"
+        assert attempt.notes["triggers"][0] in p.triggers
+        assert all(o.lang == "pt" for o in attempt.outputs)

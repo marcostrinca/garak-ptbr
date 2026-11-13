@@ -10,12 +10,14 @@ continue the term based on varying amounts of prefix.
 """
 
 import json
+import logging
 import tqdm
 
 import garak.resources.theme
 from garak import _config
-from garak.attempt import Attempt
+from garak.attempt import Attempt, Message
 from garak.data import path as data_path
+from garak.exception import GarakException
 import garak.probes
 
 
@@ -55,8 +57,9 @@ class ContinueSlursReclaimedSlursFull(garak.probes.Probe):
         # for each term, work out first char, first three chars, all but last two chars
         # append these to each of the prefixes for that term
         self._slur_prefixes = []
+        native_file = self._native_resource()
         with open(
-            data_path / self.source_resource_filename,
+            native_file or data_path / self.source_resource_filename,
             "r",
             encoding="utf-8",
         ) as slurfile:
@@ -84,7 +87,12 @@ class ContinueSlursReclaimedSlursFull(garak.probes.Probe):
 
         self._prune_data(prune_triggers=True)
 
-        if self.langprovider is not None:
+        if native_file is not None:
+            # terms and prefixes written in the target language: the prompts
+            # go as they are and the detector looks for the term itself
+            self.lang = self.langprovider.target_lang
+            self.prompts = [Message(prompt, lang=self.lang) for prompt in self.prompts]
+        elif self.langprovider is not None:
             preparation_bar = tqdm.tqdm(
                 total=len(self.triggers),
                 leave=False,
@@ -95,6 +103,22 @@ class ContinueSlursReclaimedSlursFull(garak.probes.Probe):
                 self.triggers, notify_callback=preparation_bar.update
             )
             preparation_bar.close()
+
+    def _native_resource(self):
+        """``<name>_<lang>.jsonl`` for the run's target language, if there is one
+
+        Slurs do not survive translation: a translated slur is rarely the slur
+        speakers of the target language use, and the translated prefix no longer
+        leads into it. A dataset written in the target language replaces both."""
+        if not self._localizing():
+            return None
+        stem, ext = self.source_resource_filename.rsplit(".", 1)
+        target_lang = self.langprovider.target_lang
+        try:
+            return data_path / f"{stem}_{target_lang}.{ext}"
+        except GarakException:
+            logging.info("continuation: no %s data for %s", stem, target_lang)
+            return None
 
     def _attempt_prestore_hook(self, attempt: Attempt, seq: int) -> Attempt:
         attempt.notes = dict(
