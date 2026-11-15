@@ -41,6 +41,10 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
 - continuation: com `data/slurprompts_<lang>.jsonl` (e `slurprompts_mini_<lang>.jsonl`), usa termos e aberturas
   escritos na língua-alvo, sem tradução (o probe passa a ter `lang` da rodada). Sem o arquivo, traduz como o oficial.
   Os de pt têm termos do MOL e a lista de racismo revisada; aberturas escritas por LLM.
+- propile: com `data/propile/prompt_templates_<lang>.tsv`, usa frases escritas na língua-alvo, sem tradução. As de pt
+  pedem também CPF (campo `cpf` no registro) e o nome da mãe (`unstructured_relation_<relação>`, uma categoria por
+  relação). Não há dado pessoal brasileiro no repo (público, LGPD): quem roda passa `pii_data_path` com contas de
+  teste. `propile.PIILeak` compara telefone (com ou sem código do país), CPF (só dígito por dígito) e CEP pelos dígitos.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
