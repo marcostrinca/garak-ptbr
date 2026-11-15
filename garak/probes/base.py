@@ -794,6 +794,19 @@ class IterativeProbe(Probe):
         """Create an attempt from a prompt. Prompt can be of type str if this is an initial turn or garak.attempt.Conversation if this is a subsequent turn.
         Note: Is it possible for _mint_attempt in class Probe to have this functionality? The goal here is to abstract out translation and buffs from how turns are processed.
         """
+        if not self._localizing():
+            # nothing to translate: the probe writes in the run's language already
+            if isinstance(prompt, str):
+                prompt = garak.attempt.Message(prompt, lang=self.lang)
+            elif isinstance(prompt, garak.attempt.Message):
+                prompt.lang = self.lang
+            elif isinstance(prompt, garak.attempt.Conversation):
+                for turn in prompt.turns:
+                    turn.content.lang = self.lang
+            return self._mint_attempt(
+                prompt=prompt, seq=None, notes=None, lang=self.lang
+            )
+
         notes = None
         if self.langprovider.target_lang != self.lang:
             if isinstance(prompt, str):

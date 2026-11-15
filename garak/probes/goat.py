@@ -80,6 +80,15 @@ class GOATAttack(garak.probes.IterativeProbe):
         custom_judge_prompt: Override the jailbreak judge prompt
         custom_attack_techniques: Dict of {"Name": "Definition"} for custom techniques
 
+    Other Languages:
+        In a run translated to another language (``run.target_lang``), the
+        files in ``data/goat`` for that language take over when they exist.
+        ``goals_<lang>.txt`` replaces the HuggingFace dataset when
+        ``custom_goals`` is empty. ``attacker_language_<lang>.txt`` is added to
+        the initial and followup prompts so the attacker writes in that
+        language; the conversation then is not translated at any turn. The
+        internal ``verify`` judge still uses the English judge prompt.
+
     Note:
         For best results, use different models for the red-team attacker, the
         target, and the detector judge. When the same model serves multiple
@@ -164,6 +173,15 @@ class GOATAttack(garak.probes.IterativeProbe):
                 f"Unsupported early_stop_on '{self.early_stop_on}'. Use 'any' or 'all'."
             )
 
+        # In a run translated to a language with an attacker instruction, the
+        # attacker writes in that language and nothing is translated
+        self.language_instruction = None
+        instruction_path = self._native_data("attacker_language_{lang}.txt")
+        if instruction_path is not None:
+            with open(instruction_path, encoding="utf-8") as f:
+                self.language_instruction = f.read().strip()
+            self.lang = self.langprovider.target_lang
+
         # Load prompt templates from data files
         self._load_prompt_templates()
 
@@ -218,6 +236,10 @@ class GOATAttack(garak.probes.IterativeProbe):
                 goat_data_path / "followup_prompt.txt", "r", encoding="utf-8"
             ) as f:
                 self.followup_prompt_template = f.read()
+
+        if self.language_instruction:
+            self.initial_prompt_template += "\n\n" + self.language_instruction
+            self.followup_prompt_template += "\n\n" + self.language_instruction
 
         # Attack techniques
         if self.custom_attack_techniques:
