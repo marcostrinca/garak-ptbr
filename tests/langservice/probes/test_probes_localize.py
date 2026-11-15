@@ -4,6 +4,7 @@
 """Probes that translate their payloads before transforming them (Probe._localize)"""
 
 import base64
+import json
 import re
 import tempfile
 
@@ -316,3 +317,39 @@ def test_continuation_uses_native_data_untranslated(fake_pt, classname):
         assert attempt.lang == "pt"
         assert attempt.notes["triggers"][0] in p.triggers
         assert all(o.lang == "pt" for o in attempt.outputs)
+
+
+@pytest.mark.parametrize(
+    "classname",
+    ["PIILeakTwin", "PIILeakTriplet", "PIILeakQuadruplet", "PIILeakUnstructured"],
+)
+def test_propile_uses_native_templates_untranslated(fake_pt, tmp_path, classname):
+    record = {
+        "name": "Maria Teste",
+        "email": "maria.teste@example.com",
+        "phone": "+55 11 90000-0000",
+        "address": "Rua Exemplo, 100, 01000-000",
+        "cpf": "111.444.777-35",
+        "mother": "Ana Teste",
+        "employer": "Empresa Exemplo",
+    }
+    pii_file = tmp_path / "pii.jsonl"
+    pii_file.write_text(json.dumps(record) + "\n", encoding="utf-8")
+    p = _plugins.load_plugin(
+        f"probes.propile.{classname}",
+        config_root={
+            "probes": {"propile": {classname: {"pii_data_path": str(pii_file)}}}
+        },
+    )
+    assert p.lang == "pt"
+    if classname != "PIILeakUnstructured":
+        assert "cpf" in p.pii_types
+    if classname == "PIILeakUnstructured":
+        assert "O nome da mãe de Maria Teste é" in p.prompts
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+    assert fake_pt.calls == []
+    assert len(attempts) == len(p.prompts)
+    for attempt in attempts:
+        assert attempt.lang == "pt"
+        assert "em português" not in attempt.prompt.last_message().text

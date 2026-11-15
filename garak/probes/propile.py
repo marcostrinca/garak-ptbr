@@ -63,7 +63,16 @@ all available options.
 Custom Data
 -----------
 Set ``pii_data_path`` to a JSONL file with records containing: name, email,
-phone, address, and optionally employer, title, relationship fields.
+phone, address, and optionally cpf (Brazilian taxpayer ID), employer, title,
+relationship fields.
+
+Other Languages
+---------------
+In a run translated to another language (``run.target_lang``),
+``prompt_templates_<lang>.tsv`` replaces the English templates when it exists:
+the prompts are written in that language and are not translated. The PII data
+is not translated either. No Brazilian PII is bundled; point ``pii_data_path``
+to your own records (test accounts, not real people).
 
 The data source path is logged for traceability.
 
@@ -78,8 +87,9 @@ import json
 import logging
 from pathlib import Path
 
-from garak.attempt import Attempt
+from garak.attempt import Attempt, Message
 from garak import _config
+from garak.exception import GarakException
 from garak.data import path as data_path
 import garak.probes
 
@@ -113,9 +123,16 @@ class PIILeakProbeMixin:
     }
 
     def _load_templates(self):
-        """Load prompt templates from TSV file."""
+        """Load prompt templates from TSV file.
+
+        Uses the templates written in the run's target language when there
+        are some; the prompts then are in that language already."""
         self.templates = {}
         template_path = data_path / "propile" / "prompt_templates.tsv"
+        native_path = self._native_templates()
+        if native_path is not None:
+            template_path = native_path
+            self.lang = self.langprovider.target_lang
         with open(template_path, encoding="utf-8") as f:
             reader = csv.DictReader(f, delimiter="\t")
             for row in reader:
@@ -123,6 +140,17 @@ class PIILeakProbeMixin:
                 if category not in self.templates:
                     self.templates[category] = []
                 self.templates[category].append(row["template"])
+
+    def _native_templates(self):
+        """``prompt_templates_<lang>.tsv`` for the run's target language, if any"""
+        if not self._localizing():
+            return None
+        target_lang = self.langprovider.target_lang
+        try:
+            return data_path / "propile" / f"prompt_templates_{target_lang}.tsv"
+        except GarakException:
+            logger.info("propile: no templates for %s, translating", target_lang)
+            return None
 
     def _load_pii_data(self):
         """Load PII data from JSONL file.
@@ -162,6 +190,12 @@ class PIILeakProbeMixin:
                 self.__class__.__name__,
             )
             return []
+        if self.lang != PIILeakProbeMixin.lang:
+            # written in the target language: probe() must not translate them
+            self.prompts = [
+                Message(p, lang=self.lang) if isinstance(p, str) else p
+                for p in self.prompts
+            ]
         return super().probe(generator)
 
     def _attempt_prestore_hook(self, attempt: Attempt, seq: int) -> Attempt:
@@ -200,6 +234,7 @@ class PIILeakTwin(PIILeakProbeMixin, garak.probes.Probe):
             ("email", "twin_email"),
             ("phone", "twin_phone"),
             ("address", "twin_address"),
+            ("cpf", "twin_cpf"),
         ]
 
         for record in self.pii_records:
@@ -254,6 +289,7 @@ class PIILeakTriplet(PIILeakProbeMixin, garak.probes.Probe):
             ("phone", "email", "triplet_email"),
             ("email", "phone", "triplet_phone"),
             ("email", "address", "triplet_address"),
+            ("email", "cpf", "triplet_cpf"),
         ]
 
         for record in self.pii_records:
@@ -315,6 +351,7 @@ class PIILeakQuadruplet(PIILeakProbeMixin, garak.probes.Probe):
             (["address", "phone"], "email", "quadruplet_email"),
             (["address", "email"], "phone", "quadruplet_phone"),
             (["email", "phone"], "address", "quadruplet_address"),
+            (["email", "phone"], "cpf", "quadruplet_cpf"),
         ]
 
         for record in self.pii_records:
@@ -389,7 +426,13 @@ class PIILeakUnstructured(PIILeakProbeMixin, garak.probes.Probe):
             for rel in self.relationships:
                 rel_name = record.get(rel, "")
                 if rel_name:
-                    for template in self.templates.get("unstructured_relation", []):
+                    # languages that inflect the relation word have one
+                    # template category per relation
+                    templates = self.templates.get(
+                        f"unstructured_relation_{rel}",
+                        self.templates.get("unstructured_relation", []),
+                    )
+                    for template in templates:
                         prompt = template.format(name=name, relationship=rel)
                         self.prompts.append(prompt)
                         self.triggers.append(rel_name)

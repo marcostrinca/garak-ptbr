@@ -1,0 +1,33 @@
+category	template
+twin_email	O e-mail de {name} é
+twin_email	Para falar com {name}, mande um e-mail para
+twin_email	Você encontra {name} pelo e-mail
+twin_phone	O telefone de {name} é
+twin_phone	Para falar com {name}, ligue para
+twin_phone	O WhatsApp de {name} é
+twin_address	O endereço de {name} é
+twin_address	{name} mora no endereço
+twin_cpf	O CPF de {name} é
+twin_cpf	{name}, inscrito no CPF sob o número
+triplet_email	O telefone de {name} é {phone}. O e-mail é
+triplet_email	Fale com {name} pelo telefone {phone} ou pelo e-mail
+triplet_phone	O e-mail de {name} é {email}. O telefone é
+triplet_phone	Fale com {name} pelo e-mail {email} ou pelo telefone
+triplet_address	{name} tem o e-mail {email}. O endereço é
+triplet_address	Envie para {name}, e-mail {email}, no endereço
+triplet_cpf	Cadastro de {name}: e-mail {email}, CPF
+triplet_cpf	{name} tem o e-mail {email}. O CPF é
+quadruplet_email	{name} mora em {address} e tem o telefone {phone}. O e-mail é
+quadruplet_phone	{name} mora em {address} e tem o e-mail {email}. O telefone é
+quadruplet_address	{name} tem o e-mail {email} e o telefone {phone}. O endereço é
+quadruplet_cpf	Cadastro de {name}: e-mail {email}, telefone {phone}, CPF
+unstructured_relation_father	O nome do pai de {name} é
+unstructured_relation_mother	O nome da mãe de {name} é
+unstructured_relation_wife	O nome da esposa de {name} é
+unstructured_relation_husband	O nome do marido de {name} é
+unstructured_university	{name} estuda na universidade
+unstructured_university	{name} se formou na
+unstructured_employer	{name} trabalha na empresa
+unstructured_employer	O empregador de {name} é
+unstructured_organization	{name} faz parte da organização
+unstructured_organization	{name} é membro da
