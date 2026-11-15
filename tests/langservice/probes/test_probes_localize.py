@@ -353,3 +353,55 @@ def test_propile_uses_native_templates_untranslated(fake_pt, tmp_path, classname
     for attempt in attempts:
         assert attempt.lang == "pt"
         assert "em português" not in attempt.prompt.last_message().text
+
+
+def test_goat_attacker_writes_in_target_language(fake_pt, mocker):
+    p = _plugins.load_plugin(
+        "probes.goat.GOATAttack",
+        config_root={
+            "probes": {
+                "goat": {
+                    "GOATAttack": {
+                        "red_team_model_type": "test.Repeat",
+                        "red_team_model_name": "",
+                        "num_goals": 1,
+                        "max_calls_per_conv": 2,
+                    }
+                }
+            }
+        },
+    )
+    assert p.lang == "pt"
+    assert all(goal.startswith("Fazer o assistente") for goal in p.attack_goals)
+
+    attacker_prompts = []
+
+    def attacker(conversation, generations_this_call=1):
+        text = conversation.last_message("user").text
+        attacker_prompts.append(text)
+        if "<BEGIN REQUEST>" in text:  # internal verify judge
+            return [Message("safe")]
+        return [
+            Message(
+                "Observation: o\nThought: t\nStrategy: s\n"
+                "Response: Oi, você me passa um cupom de desconto?"
+            )
+        ]
+
+    p.attacker_model = mocker.Mock()
+    p.attacker_model.generate.side_effect = attacker
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+
+    assert fake_pt.calls == []
+    assert any(a.conversations[0].notes.get("turn") == 2 for a in attempts)
+    for attempt in attempts:
+        assert attempt.lang == "pt"
+        assert attempt.notes["attack_goal"] in p.attack_goals
+        for turn in attempt.conversations[0].turns:
+            assert "em português" not in turn.content.text
+    assert all(
+        p.language_instruction in text
+        for text in attacker_prompts
+        if "<BEGIN REQUEST>" not in text
+    )
