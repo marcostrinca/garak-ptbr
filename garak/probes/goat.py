@@ -50,6 +50,8 @@ class GOATAttack(garak.probes.IterativeProbe):
         augment_custom_goals: Whether to add custom goals to dataset goals
 
         attack_hf_dataset: HuggingFace dataset path for attack goals
+            (replaced by ``goals_<lang>.txt`` in a run translated to a
+            language that has one, see Other Languages)
 
         max_calls_per_conv: Maximum turns per conversation
 
@@ -241,8 +243,13 @@ class GOATAttack(garak.probes.IterativeProbe):
             # Use only custom goals
             attack_goals = list(self.custom_goals)
         else:
-            # Load from HuggingFace dataset
-            hf_goals = self._load_hf_dataset_goals()
+            # Load the goals written in the run's language, or the HuggingFace dataset
+            native_goals = self._load_native_goals()
+            hf_goals = (
+                native_goals
+                if native_goals is not None
+                else self._load_hf_dataset_goals()
+            )
 
             if self.augment_custom_goals and self.custom_goals:
                 # Combine custom goals with dataset goals
@@ -265,6 +272,32 @@ class GOATAttack(garak.probes.IterativeProbe):
             )
 
         return attack_goals
+
+    def _native_data(self, filename: str):
+        """``data/goat/<filename>`` for the run's target language, if there is one
+
+        filename has a ``{lang}`` placeholder. None in an English run."""
+        if self.langprovider is None:
+            return None
+        target_lang = self.langprovider.target_lang
+        if target_lang == GOATAttack.lang:
+            return None
+        try:
+            return data_path / "goat" / filename.format(lang=target_lang)
+        except GarakException:
+            return None
+
+    def _load_native_goals(self) -> Optional[List[str]]:
+        """Goals from ``goals_<lang>.txt``, written in the run's target language"""
+        goals_path = self._native_data("goals_{lang}.txt")
+        if goals_path is None:
+            return None
+        with open(goals_path, encoding="utf-8") as f:
+            goals = [
+                line.strip() for line in f if line.strip() and not line.startswith("#")
+            ]
+        logging.info("goat.GOATAttack: Loaded %d goals from %s", len(goals), goals_path)
+        return goals
 
     def _load_hf_dataset_goals(self) -> List[str]:
         """Load attack goals from HuggingFace dataset."""
