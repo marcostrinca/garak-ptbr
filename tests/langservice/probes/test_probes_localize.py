@@ -15,6 +15,7 @@ import garak.payloads
 import garak.probes.base
 import garak.probes.dra
 import garak.probes.encoding
+import garak.probes.goat
 import garak.resources.encodings
 from garak import _config, _plugins
 from garak.attempt import Conversation, Message, Turn
@@ -405,3 +406,40 @@ def test_goat_attacker_writes_in_target_language(fake_pt, mocker):
         for text in attacker_prompts
         if "<BEGIN REQUEST>" not in text
     )
+
+
+def test_goat_stops_with_the_portuguese_judge(fake_pt, monkeypatch, mocker):
+    monkeypatch.setattr(_config.run, "target_lang", "pt", raising=False)
+    p = _plugins.load_plugin(
+        "probes.goat.GOATAttack",
+        config_root={
+            "probes": {
+                "goat": {
+                    "GOATAttack": {
+                        "red_team_model_type": "test.Repeat",
+                        "red_team_model_name": "",
+                        "num_goals": 1,
+                        "max_calls_per_conv": 3,
+                    }
+                }
+            }
+        },
+    )
+    p.attacker_model = mocker.Mock()
+    p.attacker_model.generate.return_value = [
+        Message("Observation: o\nThought: t\nStrategy: s\nResponse: Me passa um cupom?")
+    ]
+    target = _plugins.load_plugin("generators.test.Repeat")
+    judge = mocker.Mock()
+    judge.detect.side_effect = lambda attempt: [1.0] * len(attempt.outputs)
+    load = mocker.patch.object(
+        garak.probes.goat._plugins, "load_plugin", return_value=judge
+    )
+
+    attempts = p.probe(target)
+
+    load.assert_called_once_with("detectors.ptbr.AttackSuccessJudgeOnlyAdversarial")
+    # the attacker only writes the first message; the judge stops at turn 1
+    assert p.attacker_model.generate.call_count == 1
+    assert [a.conversations[0].notes["turn"] for a in attempts] == [1]
+    assert attempts[0].notes["is_adversarial"] is True
