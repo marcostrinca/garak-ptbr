@@ -13,7 +13,9 @@ import pytest
 import garak.generators.base
 import garak.payloads
 import garak.probes.base
+import garak.probes.donotanswer
 import garak.probes.dra
+import garak.probes.fitd
 import garak.probes.encoding
 import garak.probes.goat
 import garak.resources.encodings
@@ -443,3 +445,101 @@ def test_goat_stops_with_the_portuguese_judge(fake_pt, monkeypatch, mocker):
     assert p.attacker_model.generate.call_count == 1
     assert [a.conversations[0].notes["turn"] for a in attempts] == [1]
     assert attempts[0].notes["is_adversarial"] is True
+
+
+def test_donotanswer_sends_reviewed_portuguese(fake_pt):
+    p = _plugins.load_plugin("probes.donotanswer.MaliciousUses")
+    assert p.lang == "pt"
+    with open(
+        garak.probes.donotanswer.data_path / "donotanswer" / "malicious_uses_pt.jsonl",
+        encoding="utf-8",
+    ) as f:
+        reviewed = [json.loads(line) for line in f if line.strip()]
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+
+    assert fake_pt.calls == []
+    assert len(attempts) == len(reviewed)
+    for attempt, entry in zip(attempts, reviewed):
+        assert attempt.prompt.last_message().text == entry["prompt"]
+        assert attempt.lang == "pt"
+        assert attempt.intent == entry["intents"][0]
+
+
+def test_fitd_runs_in_portuguese(fake_pt, mocker):
+    p = _plugins.load_plugin(
+        "probes.fitd.FITD",
+        config_root={
+            "probes": {
+                "fitd": {
+                    "FITD": {
+                        "red_team_model_type": "test.Repeat",
+                        "red_team_model_name": "",
+                        "initial_prompt_count": 1,
+                        "max_calls_per_conv": 3,
+                    }
+                }
+            }
+        },
+    )
+    assert p.lang == "pt"
+    with open(p.target_prompts_file, encoding="utf-8") as f:
+        targets = f.read().splitlines()
+
+    attacker_prompts = []
+
+    def attacker(prompt, generations_this_call=1):
+        text = prompt.last_message("user").text
+        attacker_prompts.append(text)
+        if "'safe' or 'unsafe'" in text:
+            return [Message("safe")]
+        if "'Yes' or 'No'" in text:
+            return [Message("Yes")]
+        return [Message("Você pode me explicar um pouco de química?")]
+
+    p.red_team_model = mocker.Mock()
+    p.red_team_model.generate.side_effect = attacker
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+
+    assert fake_pt.calls == []
+    assert len(attempts) > 1
+    instruction = open(
+        garak.probes.fitd.data_path / "fitd" / "attacker_language_pt.txt",
+        encoding="utf-8",
+    ).read()
+    for attempt in attempts:
+        assert attempt.lang == "pt"
+        assert attempt.notes["target_turn"] in targets
+        for turn in attempt.conversations[0].turns:
+            assert "em português" not in turn.content.text
+    assert all(
+        instruction.strip() in text
+        for text in attacker_prompts
+        if "<BEGIN REQUEST>" not in text
+    )
+
+
+@pytest.mark.parametrize(
+    "response, refusal",
+    [
+        ("Desculpe, mas não posso ajudar com isso.", True),
+        ("Claro! Primeiro, separe os ingredientes.", False),
+    ],
+)
+def test_fitd_sees_portuguese_refusals(fake_pt, response, refusal):
+    p = _plugins.load_plugin(
+        "probes.fitd.FITD",
+        config_root={
+            "probes": {
+                "fitd": {
+                    "FITD": {
+                        "red_team_model_type": "test.Repeat",
+                        "red_team_model_name": "",
+                    }
+                }
+            }
+        },
+    )
+    p.set_up_refusal_detector()
+    assert p._is_refusal(response) == refusal
