@@ -68,11 +68,13 @@ class FITD(garak.probes.IterativeProbe):
 
         super().__init__(config_root=config_root)
         self._load_red_team_prompt_templates()
+        self.target_prompts_file = data_path / "harmbench" / "harmbench_prompts.txt"
         if self.lang != self.langprovider.target_lang:
-            raise GarakException(
-                "FITD probe currently does not support languages other than %s"
-                % self.lang
-            )
+            if not self._load_native_language(self.langprovider.target_lang):
+                raise GarakException(
+                    "FITD probe currently does not support languages other than %s"
+                    % self.lang
+                )
 
     def _load_red_team_prompt_templates(self):
         prompts_file = data_path / "fitd" / "prompt_template_increase_safety.txt"
@@ -104,6 +106,44 @@ class FITD(garak.probes.IterativeProbe):
             reader = csv.reader(f)
             self.sensitive_words = {row[0]: row[1] for row in reader}
 
+    def _load_native_language(self, lang: str) -> bool:
+        """Run natively in lang when data/fitd has an attacker instruction for it
+
+        The attacker writes every turn in lang, the target prompts and the
+        re-align turn are written in lang, and nothing is translated. The
+        templates the attacker reads stay in English. False when there is no
+        instruction for lang."""
+        try:
+            instruction_path = data_path / "fitd" / f"attacker_language_{lang}.txt"
+        except GarakException:
+            return False
+        with open(instruction_path, encoding="utf-8") as f:
+            instruction = f.read().strip()
+        # templates whose output is sent to the target
+        for name in [
+            "prompt_template_increase_safety",
+            "prompt_template_get_level_query",
+            "prompt_template_slippery_slope_paraphrase",
+        ]:
+            setattr(self, name, getattr(self, name).rstrip() + "\n" + instruction)
+        with open(
+            data_path / "fitd" / f"prompt_template_realign_{lang}.txt",
+            encoding="utf-8",
+        ) as f:
+            self.prompt_template_realign = f.read()
+        self.prompt_template_realign__match_prefix_len = (
+            self.prompt_template_realign.index("{") - 1
+        )
+        with open(
+            data_path / "fitd" / f"sensitive_words_{lang}.csv", encoding="utf-8"
+        ) as f:
+            self.sensitive_words = {row[0]: row[1] for row in csv.reader(f)}
+        self.target_prompts_file = (
+            data_path / "harmbench" / f"harmbench_prompts_{lang}.txt"
+        )
+        self.lang = lang
+        return True
+
     def set_up_attack_gen_llm(self):
         """Instantiate client for attack gen LLM"""
         try:
@@ -129,10 +169,13 @@ class FITD(garak.probes.IterativeProbe):
         self.detector = garak._plugins.load_plugin(f"detectors.{self.primary_detector}")
 
     def set_up_refusal_detector(self):
-        """Instantiate a garak mitigation.Prefixes detector to be used to identify refusals. Note that this is not intended to be the garak detector for the probe"""
-        self.refusal_detector = garak._plugins.load_plugin(
-            "detectors.mitigation.Prefixes"
+        """Instantiate a garak mitigation.Prefixes detector to be used to identify refusals (ptbr.MitigationBypass in a Portuguese run). Note that this is not intended to be the garak detector for the probe"""
+        name = (
+            "ptbr.MitigationBypass"
+            if self.lang.split("-")[0] == "pt"
+            else "mitigation.Prefixes"
         )
+        self.refusal_detector = garak._plugins.load_plugin(f"detectors.{name}")
 
     def _get_red_team_response(self, prompt: str) -> str:
         """Abstracting out call to attack gen LLM which is a garak Generator"""
@@ -164,10 +207,10 @@ class FITD(garak.probes.IterativeProbe):
     def _is_refusal(self, response: str) -> bool:
         """Simple string matching to check if the response is a refusal"""
         refusal_detection_attempt = garak.attempt.Attempt(
-            prompt=garak.attempt.Message(text="placeholder prompt", lang="en"),
+            prompt=garak.attempt.Message(text="placeholder prompt", lang=self.lang),
         )
         refusal_detection_attempt.outputs = [
-            garak.attempt.Message(text=response, lang="en")
+            garak.attempt.Message(text=response, lang=self.lang)
         ]
         refusal_detector_outputs = self.refusal_detector.detect(
             refusal_detection_attempt
@@ -246,8 +289,7 @@ class FITD(garak.probes.IterativeProbe):
             % data_path
         )
 
-        prompts_file = data_path / "harmbench" / "harmbench_prompts.txt"
-        with open(prompts_file, "r", encoding="utf-8") as f:
+        with open(self.target_prompts_file, "r", encoding="utf-8") as f:
             harmbench_prompts = f.read().splitlines()
             self.target_prompts = random.sample(
                 harmbench_prompts, self.initial_prompt_count

@@ -9,6 +9,10 @@ The dataset consists of prompts to which language models are often trained not t
 
 The DNA tests are somewhat opinionated and don't represent universal norms (nothing does), so use with care.
 
+In a run translated to a language with a ``<category>_<lang>.jsonl`` file in
+data/donotanswer, the probes send those questions, written in that language,
+and translate nothing.
+
 Further info:
 * https://github.com/Libr-AI/do-not-answer
 * https://arxiv.org/abs/2308.13387
@@ -19,20 +23,41 @@ import json
 import sys
 
 from garak import _config
+from garak.attempt import Message
 from garak.data import path as data_path
+from garak.exception import GarakException
 import garak.probes
 
 this = sys.modules[__name__]
 
 
+def _native_data(self):
+    """``<category>_<lang>.jsonl`` for the run's target language, if there is one"""
+    if not self._localizing():
+        return None
+    try:
+        return (
+            data_path
+            / "donotanswer"
+            / f"{self.dna_category}_{self.langprovider.target_lang}.jsonl"
+        )
+    except GarakException:
+        return None
+
+
 def load_local_data(self):
+    native_file = _native_data(self)
     with open(
-        data_path / "donotanswer" / f"{self.dna_category}.jsonl",
+        native_file or data_path / "donotanswer" / f"{self.dna_category}.jsonl",
         encoding="utf-8",
     ) as f:
         entries = [json.loads(line) for line in f if line.strip()]
     self.prompts = [e["prompt"] for e in entries]
     self._prompt_intents = [e["intents"][0] for e in entries]
+    if native_file is not None:
+        # questions reviewed in the target language go as they are
+        self.lang = self.langprovider.target_lang
+        self.prompts = [Message(prompt, lang=self.lang) for prompt in self.prompts]
 
 
 def local_constructor(self, config_root=_config):

@@ -51,6 +51,13 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   nada é traduzido. `IterativeProbe._create_attempt` só traduz quando `_localizing()`; antes retraduzia a conversa
   inteira (respostas do alvo inclusive) a cada turno. Numa rodada pt, a parada (`verify` ou `detector`) usa o juiz pt
   (`detector_for_run`), o mesmo da nota, salvo `custom_judge_prompt`.
+- donotanswer: com `data/donotanswer/<categoria>_<lang>.jsonl`, envia essas perguntas (mesma ordem e `intent` do
+  original) sem tradução e passa a ter `lang` da rodada. As de pt foram traduzidas e revisadas por LLM em dois passes.
+- fitd: com `data/fitd/attacker_language_<lang>.txt`, roda na língua-alvo (antes recusava qualquer língua além do
+  inglês). A instrução vai nos prompts do atacante que geram turnos; objetivos de `harmbench/harmbench_prompts_<lang>.txt`,
+  realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
+  vista por `ptbr.MitigationBypass` em pt. Os juízes internos do atacante (eval, aligned) seguem em inglês, e a nota
+  (`set_up_detector`) ainda usa o juiz de dano em inglês.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
@@ -86,8 +93,8 @@ Precisa dos extras `tests` do pyproject. Testes que baixam arquivo falham atrás
 - Não colocar nome, prompt ou dado de cliente neste repo.
 - Os geradores do garak mandam `stop: ["#", ";"]` por padrão; isso corta modelo com raciocínio. O juiz pt
   já suprime `stop`; no tradutor, usar `stop: null`.
-- Probes que decidem a conversa com detector próprio (ex.: FITD usa `mitigation.Prefixes` para ver recusa) não passam
-  pela troca de detectores: em pt elas não reconhecem recusa.
+- Probes que decidem a conversa com detector próprio não passam pela troca de detectores. Na língua-alvo, trocar no
+  próprio probe (FITD e GOAT já trocam em pt).
 - `tests/langservice/probes/test_probes_goodside.py::test_Tag_attempt_descrs_translation` falha também no
   garak original (JSONDecodeError em `_convert_json_string`); não é regressão.
 
