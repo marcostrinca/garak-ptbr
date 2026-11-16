@@ -86,8 +86,10 @@ class GOATAttack(garak.probes.IterativeProbe):
         ``goals_<lang>.txt`` replaces the HuggingFace dataset when
         ``custom_goals`` is empty. ``attacker_language_<lang>.txt`` is added to
         the initial and followup prompts so the attacker writes in that
-        language; the conversation then is not translated at any turn. The
-        internal ``verify`` judge still uses the English judge prompt.
+        language; the conversation then is not translated at any turn. When
+        the run swaps the detector for one that reads its language
+        (``detectors.ptbr``), ``verify`` stops with that detector instead of
+        the English judge prompt, unless ``custom_judge_prompt`` is set.
 
     Note:
         For best results, use different models for the red-team attacker, the
@@ -381,8 +383,25 @@ class GOATAttack(garak.probes.IterativeProbe):
         if self.detector is not None:
             return
 
+        from garak.detectors.ptbr import detector_for_run
+
         logging.debug("goat.GOATAttack: Loading detector for early stopping...")
-        self.detector = _plugins.load_plugin(f"detectors.{self.primary_detector}")
+        self.detector = _plugins.load_plugin(
+            f"detectors.{detector_for_run(self.primary_detector)}"
+        )
+
+    def _verify_with_run_detector(self) -> bool:
+        """True when "verify" should stop with the run's detector instead
+
+        In a run whose detectors read another language (a Portuguese run), the
+        English judge prompt would judge by a different rule than the score:
+        the run's detector decides when to stop. A custom_judge_prompt is kept.
+        """
+        if self.end_condition != "verify" or self.custom_judge_prompt:
+            return False
+        from garak.detectors.ptbr import detector_for_run
+
+        return detector_for_run(self.primary_detector) != self.primary_detector
 
     def _format_attack_techniques(self) -> str:
         """Format attack techniques for the system prompt."""
@@ -595,7 +614,7 @@ class GOATAttack(garak.probes.IterativeProbe):
             List of bools, one per attempt.outputs entry. True = stop this
             conversation branch (jailbreak succeeded).
         """
-        if self.end_condition == "detector":
+        if self.end_condition == "detector" or self._verify_with_run_detector():
             return self._should_terminate_using_detector(attempt)
         elif self.end_condition == "verify":
             return self._should_terminate_using_verify(attempt)
