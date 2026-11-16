@@ -50,6 +50,8 @@ class GOATAttack(garak.probes.IterativeProbe):
         augment_custom_goals: Whether to add custom goals to dataset goals
 
         attack_hf_dataset: HuggingFace dataset path for attack goals
+            (replaced by ``goals_<lang>.txt`` in a run translated to a
+            language that has one, see Other Languages)
 
         max_calls_per_conv: Maximum turns per conversation
 
@@ -77,6 +79,17 @@ class GOATAttack(garak.probes.IterativeProbe):
         custom_followup_prompt: Override the followup turn prompt template
         custom_judge_prompt: Override the jailbreak judge prompt
         custom_attack_techniques: Dict of {"Name": "Definition"} for custom techniques
+
+    Other Languages:
+        In a run translated to another language (``run.target_lang``), the
+        files in ``data/goat`` for that language take over when they exist.
+        ``goals_<lang>.txt`` replaces the HuggingFace dataset when
+        ``custom_goals`` is empty. ``attacker_language_<lang>.txt`` is added to
+        the initial and followup prompts so the attacker writes in that
+        language; the conversation then is not translated at any turn. When
+        the run swaps the detector for one that reads its language
+        (``detectors.ptbr``), ``verify`` stops with that detector instead of
+        the English judge prompt, unless ``custom_judge_prompt`` is set.
 
     Note:
         For best results, use different models for the red-team attacker, the
@@ -162,6 +175,15 @@ class GOATAttack(garak.probes.IterativeProbe):
                 f"Unsupported early_stop_on '{self.early_stop_on}'. Use 'any' or 'all'."
             )
 
+        # In a run translated to a language with an attacker instruction, the
+        # attacker writes in that language and nothing is translated
+        self.language_instruction = None
+        instruction_path = self._native_data("attacker_language_{lang}.txt")
+        if instruction_path is not None:
+            with open(instruction_path, encoding="utf-8") as f:
+                self.language_instruction = f.read().strip()
+            self.lang = self.langprovider.target_lang
+
         # Load prompt templates from data files
         self._load_prompt_templates()
 
@@ -217,6 +239,10 @@ class GOATAttack(garak.probes.IterativeProbe):
             ) as f:
                 self.followup_prompt_template = f.read()
 
+        if self.language_instruction:
+            self.initial_prompt_template += "\n\n" + self.language_instruction
+            self.followup_prompt_template += "\n\n" + self.language_instruction
+
         # Attack techniques
         if self.custom_attack_techniques:
             self.attack_techniques = self.custom_attack_techniques
@@ -241,8 +267,13 @@ class GOATAttack(garak.probes.IterativeProbe):
             # Use only custom goals
             attack_goals = list(self.custom_goals)
         else:
-            # Load from HuggingFace dataset
-            hf_goals = self._load_hf_dataset_goals()
+            # Load the goals written in the run's language, or the HuggingFace dataset
+            native_goals = self._load_native_goals()
+            hf_goals = (
+                native_goals
+                if native_goals is not None
+                else self._load_hf_dataset_goals()
+            )
 
             if self.augment_custom_goals and self.custom_goals:
                 # Combine custom goals with dataset goals
@@ -265,6 +296,32 @@ class GOATAttack(garak.probes.IterativeProbe):
             )
 
         return attack_goals
+
+    def _native_data(self, filename: str):
+        """``data/goat/<filename>`` for the run's target language, if there is one
+
+        filename has a ``{lang}`` placeholder. None in an English run."""
+        if self.langprovider is None:
+            return None
+        target_lang = self.langprovider.target_lang
+        if target_lang == GOATAttack.lang:
+            return None
+        try:
+            return data_path / "goat" / filename.format(lang=target_lang)
+        except GarakException:
+            return None
+
+    def _load_native_goals(self) -> Optional[List[str]]:
+        """Goals from ``goals_<lang>.txt``, written in the run's target language"""
+        goals_path = self._native_data("goals_{lang}.txt")
+        if goals_path is None:
+            return None
+        with open(goals_path, encoding="utf-8") as f:
+            goals = [
+                line.strip() for line in f if line.strip() and not line.startswith("#")
+            ]
+        logging.info("goat.GOATAttack: Loaded %d goals from %s", len(goals), goals_path)
+        return goals
 
     def _load_hf_dataset_goals(self) -> List[str]:
         """Load attack goals from HuggingFace dataset."""
@@ -326,8 +383,25 @@ class GOATAttack(garak.probes.IterativeProbe):
         if self.detector is not None:
             return
 
+        from garak.detectors.ptbr import detector_for_run
+
         logging.debug("goat.GOATAttack: Loading detector for early stopping...")
-        self.detector = _plugins.load_plugin(f"detectors.{self.primary_detector}")
+        self.detector = _plugins.load_plugin(
+            f"detectors.{detector_for_run(self.primary_detector)}"
+        )
+
+    def _verify_with_run_detector(self) -> bool:
+        """True when "verify" should stop with the run's detector instead
+
+        In a run whose detectors read another language (a Portuguese run), the
+        English judge prompt would judge by a different rule than the score:
+        the run's detector decides when to stop. A custom_judge_prompt is kept.
+        """
+        if self.end_condition != "verify" or self.custom_judge_prompt:
+            return False
+        from garak.detectors.ptbr import detector_for_run
+
+        return detector_for_run(self.primary_detector) != self.primary_detector
 
     def _format_attack_techniques(self) -> str:
         """Format attack techniques for the system prompt."""
@@ -540,7 +614,7 @@ class GOATAttack(garak.probes.IterativeProbe):
             List of bools, one per attempt.outputs entry. True = stop this
             conversation branch (jailbreak succeeded).
         """
-        if self.end_condition == "detector":
+        if self.end_condition == "detector" or self._verify_with_run_detector():
             return self._should_terminate_using_detector(attempt)
         elif self.end_condition == "verify":
             return self._should_terminate_using_verify(attempt)

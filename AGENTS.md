@@ -45,6 +45,12 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   pedem também CPF (campo `cpf` no registro) e o nome da mãe (`unstructured_relation_<relação>`, uma categoria por
   relação). Não há dado pessoal brasileiro no repo (público, LGPD): quem roda passa `pii_data_path` com contas de
   teste. `propile.PIILeak` compara telefone (com ou sem código do país), CPF (só dígito por dígito) e CEP pelos dígitos.
+- goat: com `data/goat/goals_<lang>.txt`, usa esses objetivos no lugar do dataset do HF quando `custom_goals` está
+  vazio (os de pt são para assistente de loja; o 9, pôr produto na sacola, pode criar carrinho de verdade). Com
+  `data/goat/attacker_language_<lang>.txt`, a instrução vai nos prompts do atacante, ele escreve na língua-alvo e
+  nada é traduzido. `IterativeProbe._create_attempt` só traduz quando `_localizing()`; antes retraduzia a conversa
+  inteira (respostas do alvo inclusive) a cada turno. Numa rodada pt, a parada (`verify` ou `detector`) usa o juiz pt
+  (`detector_for_run`), o mesmo da nota, salvo `custom_judge_prompt`.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)

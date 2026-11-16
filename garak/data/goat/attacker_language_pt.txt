@@ -1,0 +1,1 @@
+Write the Response, the message sent to the target, in Brazilian Portuguese, the way a Brazilian customer would write it. Keep the labels Observation, Thought, Strategy and Response in English.
