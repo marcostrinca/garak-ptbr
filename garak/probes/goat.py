@@ -18,6 +18,7 @@ import logging
 import random
 import re
 from collections import defaultdict
+from pathlib import Path
 from typing import Dict, Iterable, List, Optional, Tuple
 
 from tqdm import tqdm
@@ -48,6 +49,11 @@ class GOATAttack(garak.probes.IterativeProbe):
         custom_goals: List of custom attack goals
 
         augment_custom_goals: Whether to add custom goals to dataset goals
+
+        goals_file: File with one attack goal per line (``#`` starts a
+            comment line). A bare file name is looked up in ``data/goat``,
+            e.g. ``goals_retail_en.txt``. Replaces ``goals_<lang>.txt`` and the
+            HuggingFace dataset; ``custom_goals`` still takes precedence.
 
         attack_hf_dataset: HuggingFace dataset path for attack goals
             (replaced by ``goals_<lang>.txt`` in a run translated to a
@@ -84,7 +90,7 @@ class GOATAttack(garak.probes.IterativeProbe):
         In a run translated to another language (``run.target_lang``), the
         files in ``data/goat`` for that language take over when they exist.
         ``goals_<lang>.txt`` replaces the HuggingFace dataset when
-        ``custom_goals`` is empty. ``attacker_language_<lang>.txt`` is added to
+        ``custom_goals`` and ``goals_file`` are empty. ``attacker_language_<lang>.txt`` is added to
         the initial and followup prompts so the attacker writes in that
         language; the conversation then is not translated at any turn. When
         the run swaps the detector for one that reads its language
@@ -145,6 +151,7 @@ class GOATAttack(garak.probes.IterativeProbe):
         # Goal configuration
         "custom_goals": [],
         "augment_custom_goals": False,
+        "goals_file": None,
         "attack_hf_dataset": "JailbreakBench/JBB-Behaviors",
         "attack_hf_dataset_load_kwargs": {"split": "harmful", "name": "behaviors"},
         "attack_hf_dataset_column": "Goal",
@@ -267,8 +274,11 @@ class GOATAttack(garak.probes.IterativeProbe):
             # Use only custom goals
             attack_goals = list(self.custom_goals)
         else:
-            # Load the goals written in the run's language, or the HuggingFace dataset
-            native_goals = self._load_native_goals()
+            # Load the goals file, the goals written in the run's language,
+            # or the HuggingFace dataset
+            native_goals = self._load_goals_file()
+            if native_goals is None:
+                native_goals = self._load_native_goals()
             hf_goals = (
                 native_goals
                 if native_goals is not None
@@ -292,7 +302,7 @@ class GOATAttack(garak.probes.IterativeProbe):
         if not attack_goals:
             raise GarakException(
                 "goat.GOATAttack: No attack goals loaded. "
-                "Check custom_goals or attack_hf_dataset configuration."
+                "Check custom_goals, goals_file or attack_hf_dataset configuration."
             )
 
         return attack_goals
@@ -311,11 +321,25 @@ class GOATAttack(garak.probes.IterativeProbe):
         except GarakException:
             return None
 
+    def _load_goals_file(self) -> Optional[List[str]]:
+        """Goals from ``goals_file``, a path or a file name in ``data/goat``"""
+        if not self.goals_file:
+            return None
+        goals_path = Path(self.goals_file)
+        if not goals_path.is_file():
+            goals_path = data_path / "goat" / self.goals_file
+        return self._read_goals(goals_path)
+
     def _load_native_goals(self) -> Optional[List[str]]:
         """Goals from ``goals_<lang>.txt``, written in the run's target language"""
         goals_path = self._native_data("goals_{lang}.txt")
         if goals_path is None:
             return None
+        return self._read_goals(goals_path)
+
+    @staticmethod
+    def _read_goals(goals_path) -> List[str]:
+        """One goal per line; blank lines and ``#`` lines are skipped"""
         with open(goals_path, encoding="utf-8") as f:
             goals = [
                 line.strip() for line in f if line.strip() and not line.startswith("#")
