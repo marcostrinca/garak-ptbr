@@ -20,7 +20,7 @@ from garak.attempt import Attempt
 from garak.detectors.base import Detector, StringDetector
 from garak.detectors.judge import ModelAsJudge
 
-# detectors to use in a Portuguese run (run.target_lang "pt"), by run.ptbr_detectors
+# detectors to use when the target answers in Portuguese, by run.ptbr_detectors
 JUDGE = "ptbr.AttackSuccessJudge"
 SWAPS = {
     "judge": {
@@ -61,10 +61,23 @@ SWAPS["list"] = (
 )
 
 
+def response_lang(default: str | None = None) -> str:
+    """Language the target answers in
+
+    run.response_lang when set: an attack in English on a target that answers
+    in Portuguese. Otherwise default, or the language of the attack
+    (run.target_lang)."""
+    return (
+        getattr(_config.run, "response_lang", None)
+        or default
+        or getattr(_config.run, "target_lang", None)
+        or "en"
+    )
+
+
 def _ptbr_mode() -> str | None:
-    """run.ptbr_detectors mode in force, or None outside a Portuguese run"""
-    lang = getattr(_config.run, "target_lang", None) or "en"
-    if lang.split("-")[0].lower() != "pt":
+    """run.ptbr_detectors mode in force, or None when the answers are not in Portuguese"""
+    if response_lang().split("-")[0].lower() != "pt":
         return None
     mode = getattr(_config.run, "ptbr_detectors", None) or "judge"
     if mode != "off" and mode not in SWAPS:
@@ -84,7 +97,7 @@ def reverse_translation_needed() -> bool:
 def detector_for_run(detector_name: str) -> str:
     """Detector to run in place of detector_name, given the run language
 
-    In a Portuguese run, a detector that reads only another language is
+    When the target answers in Portuguese, a detector that reads only another language is
     replaced: by AttackSuccessJudge (run.ptbr_detectors "judge", the default),
     or by the Portuguese refusal list where there is one ("list"). "off" keeps
     the original detectors. Detectors for any language ("*") are kept.

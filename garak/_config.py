@@ -124,6 +124,7 @@ config_files = []
 run.seed = None
 run.soft_probe_prompt_cap = 64
 run.target_lang = "en"
+run.response_lang = None  # language of the answers when not target_lang (detectors.ptbr)
 run.langproviders = []
 run.spec = None  # unified selection spec; None -> implicit probes.* at resolve time
 

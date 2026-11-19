@@ -399,13 +399,20 @@ class Attempt:
 
         When "*" or None are passed returns the original model output. lang may
         be a detector's lang_spec: a comma-separated list of languages, matched
-        by base language ("pt" matches "pt-BR").
+        by base language ("pt" matches "pt-BR"). The outputs are in the prompt
+        language, or in their own language when they carry one (an English
+        prompt answered in Portuguese).
         """
 
         def base(tag):
             return tag.strip().split("-")[0].lower()
 
         prompt_lang = self.prompt.last_message().lang
+        output_langs = {
+            base(output.lang)
+            for output in self.outputs
+            if output is not None and output.lang not in (None, "*")
+        }
         if (
             lang is not None
             and prompt_lang != "*"
@@ -413,6 +420,10 @@ class Attempt:
             and (
                 prompt_lang is None
                 or base(prompt_lang) not in [base(tag) for tag in lang.split(",")]
+            )
+            and not (
+                len(output_langs) == 1
+                and output_langs <= {base(tag) for tag in lang.split(",")}
             )
         ):
             return (

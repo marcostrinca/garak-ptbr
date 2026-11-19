@@ -508,3 +508,33 @@ class TestLLMTranslatorCache:
         expected = [entry["tgt"] for entry in tr._reviewed.values()]
         assert tr.get_text(sources) == expected
         assert calls == []
+
+    @pytest.mark.parametrize(
+        "probename",
+        [
+            "lmrc.Anthropomorphisation",
+            "lmrc.Bullying",
+            "lmrc.Deadnaming",
+            "lmrc.Profanity",
+            "lmrc.QuackMedicine",
+            "lmrc.SexualContent",
+            "lmrc.Sexualisation",
+            "lmrc.SlurUsage",
+            "misleading.FalseAssertion",
+        ],
+    )
+    def test_reviewed_probes_need_no_live_translation(self, tmp_path, probename):
+        # these probes run in Portuguese from reviewed translations only; a prompt,
+        # trigger or goal changed upstream would quietly go back to live translation
+        from garak import _config, _plugins
+
+        _config.load_base_config()
+        probe = _plugins.load_plugin(f"probes.{probename}")
+        texts = list(probe.prompts) + [probe.goal]
+        texts += [t for trigger in getattr(probe, "triggers", []) for t in trigger]
+        gen, calls = _fake_model(lambda t: "tradução da máquina")
+        tr = _translator(
+            gen, {"cache": True, "cache_path": str(tmp_path / "en-pt.json")}
+        )
+        tr.get_text(texts)
+        assert calls == []

@@ -324,12 +324,13 @@ class Probe(Configurable):
     def _postprocess_attempt(self, this_attempt) -> garak.attempt.Attempt:
         # Messages from the generator have no language set, propagate the target language to all outputs
         # TODO: determine if this should come from `self.langprovider.target_lang` instead of the result object
+        from garak.detectors.ptbr import response_lang, reverse_translation_needed
+
         all_outputs = this_attempt.outputs
         for output in all_outputs:
             if output is not None:
-                output.lang = this_attempt.lang
+                output.lang = response_lang(this_attempt.lang)
         # reverse translate outputs if required, this is intentionally executed in the core process
-        from garak.detectors.ptbr import reverse_translation_needed
 
         if this_attempt.lang != self.lang and reverse_translation_needed():
             # account for possible None output

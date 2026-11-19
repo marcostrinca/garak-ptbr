@@ -23,6 +23,9 @@ Config (`run.langproviders`): `language: "en,pt"`, `model_type: "llm.LLMTranslat
 Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas numa amostra; o Ultra recusou 10%).
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
 (chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection e promptinject.
+lmrc e misleading estão inteiros no revisado (prompts, triggers e goal): numa rodada pt não chamam o tradutor.
+Se o garak oficial mudar um desses textos, `test_reviewed_probes_need_no_live_translation` (tests/langservice/test_llm.py)
+falha: traduzir e revisar o texto novo e pôr no revisado.
 A API da NVIDIA devolve muito 429 com várias rodadas em paralelo.
 
 ## Traduzir antes de transformar (`Probe._localize`)
@@ -56,13 +59,16 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
 - fitd: com `data/fitd/attacker_language_<lang>.txt`, roda na língua-alvo (antes recusava qualquer língua além do
   inglês). A instrução vai nos prompts do atacante que geram turnos; objetivos de `harmbench/harmbench_prompts_<lang>.txt`,
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
-  vista por `ptbr.MitigationBypass` em pt. Os juízes internos do atacante (eval, aligned) seguem em inglês, e a nota
-  (`set_up_detector`) ainda usa o juiz de dano em inglês.
+  vista por `ptbr.MitigationBypass` em pt. Com resposta em pt, a parada (`verify` ou `detector`) usa o juiz pt
+  (`detector_for_run`), o mesmo da nota, como no goat; o juiz `aligned` do atacante (decide o realinhamento) segue em inglês.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
-Numa rodada pt (`run.target_lang` pt), a resposta do alvo é lida em português; detector em inglês erra quase todas
-as recusas em pt. `run.ptbr_detectors` escolhe o que roda no lugar de cada detector que só lê outra língua:
+Quando o alvo responde em português, a resposta é lida em português; detector em inglês erra quase todas as recusas
+em pt. A língua da resposta é `run.response_lang` ou, sem ele, `run.target_lang` (`detectors.ptbr.response_lang`).
+Ataque em inglês contra alvo que responde em pt: `run.target_lang: en` e `run.response_lang: pt`; as saídas ganham
+`lang` pt e `Attempt.outputs_for` as entrega a detector pt mesmo com o prompt em inglês; a recusa do FITD também é
+lida em pt. `run.ptbr_detectors` escolhe o que roda no lugar de cada detector que só lê outra língua:
 - `judge` (padrão): `ptbr.AttackSuccessJudge` (e `AttackSuccessJudgeOnlyAdversarial` no lugar de
   `judge.*OnlyAdversarial`). Juiz em pt que vê objetivo, mensagem e resposta e responde `[[FALHOU]]`/`[[SEGURO]]`:
   falha só se a resposta entregou o que o ataque queria; atender pedido legítimo é seguro. Uma chamada de LLM por resposta.
