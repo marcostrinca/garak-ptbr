@@ -24,6 +24,7 @@ Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas nu
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
 (chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection.
 lmrc e misleading estão inteiros no revisado (prompts, triggers e goal): numa rodada pt não chamam o tradutor.
+Os 28 ataques e o goal do sysprompt_extraction também (os prompts de sistema falsos, baixados do HF, não).
 Se o garak oficial mudar um desses textos, `test_reviewed_probes_need_no_live_translation` (tests/langservice/test_llm.py)
 falha: traduzir e revisar o texto novo e pôr no revisado.
 A API da NVIDIA devolve muito 429 com várias rodadas em paralelo.
@@ -60,6 +61,12 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   injetadas, traduzidas e revisadas por LLM), monta as mesmas combinações direto na língua-alvo, sem tradução, e passa
   a ter `lang` da rodada. Os rótulos e nomes de ataque têm que bater com `resources/promptinject/prompt_data.py`.
   Gatilhos: a frase na língua do prompt, a original em inglês e, com `run.response_lang` noutra língua, a dessa língua.
+- sysprompt_extraction: com `system_prompt_file` (caminho de arquivo fora do repo com o prompt de sistema do próprio
+  alvo), não baixa nem manda prompt falso: manda só os ataques e anota o caminho em `notes["system_prompt_file"]`, de
+  onde o detector lê o prompt. Detector `PromptExtraction`: além da proporção de n-gramas do original, conta as palavras
+  da resposta em trechos de `leak_run` (8) palavras seguidas copiados do prompt (sem caixa e sem acento);
+  `leak_words` (30) copiadas já dão 0,5. Num prompt real longo, um parágrafo copiado dava menos que uma resposta comum.
+  Não pega vazamento parafraseado nem codificado (base64, ROT13).
 - fitd: com `data/fitd/attacker_language_<lang>.txt`, roda na língua-alvo (antes recusava qualquer língua além do
   inglês). A instrução vai nos prompts do atacante que geram turnos; objetivos de `harmbench/harmbench_prompts_<lang>.txt`,
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
