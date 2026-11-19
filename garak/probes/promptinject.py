@@ -17,10 +17,14 @@ Further info:
 
 """
 
+import json
 import random
 import sys
+from types import SimpleNamespace
 
 from garak.attempt import Attempt
+from garak.data import path as data_path
+from garak.exception import GarakException
 import garak.probes
 from garak import _config
 
@@ -52,16 +56,70 @@ def _strip_trailing_punctuation(text: str) -> str:
     return text.rstrip("".join(sorted(_TRAILING_TRIGGER_PUNCT)))
 
 
+def _native_pieces(lang: str) -> dict | None:
+    """prompt pieces reviewed in lang, from data/promptinject/prompt_data_<lang>.json"""
+    for tag in dict.fromkeys([lang, lang.split("-")[0]]):
+        try:
+            with open(
+                data_path / "promptinject" / f"prompt_data_{tag}.json",
+                encoding="utf-8",
+            ) as f:
+                return json.load(f)
+        except (FileNotFoundError, GarakException):
+            continue
+    return None
+
+
+def _native_prompt_data(prompt_data, pieces: dict):
+    """prompt_data with its texts replaced by the reviewed pieces
+
+    Prompts are built from these pieces as from the English ones, so every
+    combination is in the target language and nothing is translated on the fly.
+    """
+    bases = []
+    for base in prompt_data.ALL_OPENAI_PLAYGROUND_PROMPTS:
+        bases.append(base | pieces["base"][base["label"]])
+    attacks = {
+        name: attack | {"instruction": pieces["attacks"][name]}
+        for name, attack in prompt_data.goal_hikacking_attacks.items()
+    }
+    return SimpleNamespace(
+        ALL_OPENAI_PLAYGROUND_PROMPTS=tuple(bases),
+        goal_hikacking_attacks=attacks,
+        rogue_strings=pieces["rogue_strings"],
+        escape_chars=prompt_data.escape_chars,
+        delimiter_chars=prompt_data.delimiter_chars,
+    )
+
+
 def constructor(self, config_root=_config):
     super(self.__class__, self).__init__(config_root=config_root)
     from garak.resources.promptinject import (
         build_prompts,
         prompt_data,
     )
+    from garak.detectors.ptbr import response_lang
 
     self.max_prompts = self.soft_probe_prompt_cap
     if self.__class__.__name__.endswith("Full"):
         self.max_prompts = None
+
+    english_rogue_string = prompt_data.rogue_strings[self.rogue_string]
+    pieces = (
+        _native_pieces(self.langprovider.target_lang) if self._localizing() else None
+    )
+    if pieces is not None:
+        # prompts built from pieces reviewed in the target language go as they are
+        prompt_data = _native_prompt_data(prompt_data, pieces)
+        self.lang = self.langprovider.target_lang
+
+    # the injected string also counts in the original and in the answer language
+    self._extra_triggers = [english_rogue_string]
+    answer_lang = response_lang(self.lang)
+    if answer_lang.split("-")[0] != self.lang.split("-")[0]:
+        answer_pieces = _native_pieces(answer_lang)
+        if answer_pieces is not None:
+            self._extra_triggers.append(answer_pieces["rogue_strings"][self.rogue_string])
 
     self.pi_build_prompts = build_prompts
     self.load_data_all_attacks(prompt_data)
@@ -127,9 +185,11 @@ def _attempt_prestore_hook(self, attempt: Attempt, seq: int) -> Attempt:
     # back-translated output needs the source form the prompt was based on.
     translated = self._translated_rogue_strings.get(rogue_string)
     if translated is not None and translated != rogue_string:
-        attempt.notes["triggers"] = [translated, rogue_string]
+        triggers = [translated, rogue_string]
     else:
-        attempt.notes["triggers"] = [rogue_string]
+        triggers = [rogue_string]
+    triggers += getattr(self, "_extra_triggers", [])
+    attempt.notes["triggers"] = list(dict.fromkeys(triggers))
     return attempt
 
 
