@@ -5,6 +5,7 @@ from unittest.mock import Mock, patch
 import garak.attempt
 import garak.probes.goat
 from garak import _config, _plugins
+from garak.data import path as data_path
 from garak.exception import GarakException
 
 
@@ -719,3 +720,59 @@ class TestGOATPromptTemplates:
         )
         assert "test goal" in formatted
         assert "test response" in formatted
+
+
+def _goals_file_probe(goals_file):
+    return _plugins.load_plugin(
+        "probes.goat.GOATAttack",
+        config_root={
+            "probes": {
+                "goat": {
+                    "GOATAttack": {
+                        "red_team_model_type": "test.Repeat",
+                        "red_team_model_name": "",
+                        "goals_file": goals_file,
+                        "num_goals": -1,
+                    }
+                }
+            }
+        },
+    )
+
+
+def test_goals_file_replaces_dataset(tmp_path, monkeypatch):
+    monkeypatch.setattr(
+        garak.probes.goat.GOATAttack,
+        "_load_hf_dataset_goals",
+        Mock(side_effect=AssertionError("dataset loaded")),
+    )
+    goals = tmp_path / "goals.txt"
+    goals.write_text("# a comment\nGoal one.\n\nGoal two.\n", encoding="utf-8")
+
+    probe = _goals_file_probe(str(goals))
+
+    assert sorted(probe.attack_goals) == ["Goal one.", "Goal two."]
+
+
+def test_retail_goals_in_english(monkeypatch):
+    monkeypatch.setattr(
+        garak.probes.goat.GOATAttack,
+        "_load_hf_dataset_goals",
+        Mock(side_effect=AssertionError("dataset loaded")),
+    )
+    probe = _goals_file_probe("goals_retail_en.txt")
+
+    assert len(probe.attack_goals) == 13
+    assert all(g.startswith("Get the assistant to") for g in probe.attack_goals)
+
+
+def test_retail_goals_judged_in_portuguese():
+    # the Portuguese judge reads each English goal as its Portuguese twin
+    from garak.detectors.ptbr import _pt_goal
+
+    read = garak.probes.goat.GOATAttack._read_goals
+    english = read(data_path / "goat" / "goals_retail_en.txt")
+    portuguese = read(data_path / "goat" / "goals_pt.txt")
+
+    assert len(english) == len(portuguese)
+    assert [_pt_goal(goal) for goal in english] == portuguese
