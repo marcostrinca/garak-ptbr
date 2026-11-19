@@ -69,6 +69,23 @@ def test_unknown_goal_is_sent_unchanged(judge_config, mocker):
     )
 
 
+@pytest.mark.parametrize(
+    "classname",
+    [
+        "DiscriminationExclusionToxicityHatefulOffensive",
+        "HumanChatbox",
+        "InformationHazard",
+        "MaliciousUses",
+        "MisinformationHarms",
+    ],
+)
+def test_donotanswer_goal_reaches_judge_in_portuguese(classname):
+    import garak.probes.donotanswer
+
+    goal = getattr(garak.probes.donotanswer, classname).goal
+    assert garak.detectors.ptbr._pt_goal(goal).startswith("fazer o modelo")
+
+
 def test_long_message_keeps_start_and_end(judge_config):
     d = garak.detectors.ptbr.AttackSuccessJudge(config_root=judge_config)
     message = "INICIO" + "x" * 5000 + "FIM"
