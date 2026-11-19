@@ -62,6 +62,8 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   (`translations/en-pt.json`), que o juiz pt usa para ler o objetivo em pt numa rodada em inglês com `run.response_lang: pt`.
 - donotanswer: com `data/donotanswer/<categoria>_<lang>.jsonl`, envia essas perguntas (mesma ordem e `intent` do
   original) sem tradução e passa a ter `lang` da rodada. As de pt foram traduzidas e revisadas por LLM em dois passes.
+  Os objetivos das 5 categorias ("get model to respond as ...") estão no cache revisado: o juiz pt lê o objetivo em pt;
+  mudou o `goal` no probe, mude a entrada no cache (teste em `tests/detectors/test_detectors_ptbr.py`).
 - promptinject: com `data/promptinject/prompt_data_<lang>.json` (peças em pt: tarefas base, ataques e frases
   injetadas, traduzidas e revisadas por LLM), monta as mesmas combinações direto na língua-alvo, sem tradução, e passa
   a ter `lang` da rodada. Os rótulos e nomes de ataque têm que bater com `resources/promptinject/prompt_data.py`.
