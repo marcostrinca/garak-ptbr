@@ -54,7 +54,10 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   `data/goat/attacker_language_<lang>.txt`, a instrução vai nos prompts do atacante, ele escreve na língua-alvo e
   nada é traduzido. `IterativeProbe._create_attempt` só traduz quando `_localizing()`; antes retraduzia a conversa
   inteira (respostas do alvo inclusive) a cada turno. Numa rodada pt, a parada (`verify` ou `detector`) usa o juiz pt
-  (`detector_for_run`), o mesmo da nota, salvo `custom_judge_prompt`.
+  (`detector_for_run`), o mesmo da nota, salvo `custom_judge_prompt`. `goals_file` (caminho ou nome em `data/goat`)
+  passa na frente de `goals_<lang>.txt` e do HF; `custom_goals` segue primeiro. `goals_retail_en.txt` é o gêmeo em
+  inglês de `goals_pt.txt`, mesma ordem: mudou um, mude o outro e a entrada en→pt de cada objetivo no cache
+  (`translations/en-pt.json`), que o juiz pt usa para ler o objetivo em pt numa rodada em inglês com `run.response_lang: pt`.
 - donotanswer: com `data/donotanswer/<categoria>_<lang>.jsonl`, envia essas perguntas (mesma ordem e `intent` do
   original) sem tradução e passa a ter `lang` da rodada. As de pt foram traduzidas e revisadas por LLM em dois passes.
 - promptinject: com `data/promptinject/prompt_data_<lang>.json` (peças em pt: tarefas base, ataques e frases
