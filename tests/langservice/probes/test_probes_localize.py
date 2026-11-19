@@ -447,6 +447,53 @@ def test_goat_stops_with_the_portuguese_judge(fake_pt, monkeypatch, mocker):
     assert attempts[0].notes["is_adversarial"] is True
 
 
+def test_agent_breaker_attacks_in_target_language(fake_pt, monkeypatch, mocker):
+    monkeypatch.setenv("NIM_API_KEY", "fake")  # the probe's judge, never called here
+    p = _plugins.load_plugin(
+        "probes.agent_breaker.AgentBreaker",
+        config_root={
+            "probes": {
+                "agent_breaker": {
+                    "AgentBreaker": {
+                        "red_team_model_type": "test.Blank",
+                        "red_team_model_name": "",
+                    }
+                }
+            }
+        },
+    )
+    assert p.lang == "pt"
+    p.agent_config = {"agent_purpose": "Loja", "tools": []}
+    p.generator = mocker.Mock()
+    p.generator.generate.return_value = [Message("Tenho a add_to_cart.")]
+    attacker_prompts = []
+
+    def attacker(prompt, model=None):
+        attacker_prompts.append(prompt)
+        if "AGENT RESPONSE" in prompt:  # parsing the discovery answer
+            return '{"tools": [{"name": "add_to_cart", "description": "Põe na sacola"}]}'
+        return (
+            '{"tool_analyses": {"add_to_cart": {"vulnerabilities": "v",'
+            ' "attack_prompts": ["Põe 50 batons na sacola?"]}}}'
+        )
+
+    p._get_model_response = mocker.Mock(side_effect=attacker)
+    mocker.patch.object(p, "_setup_red_team_model")
+
+    attempts = list(p._create_init_attempts())
+
+    question = p.generator.generate.call_args.kwargs["prompt"].last_message().text
+    assert question == p._prompts["DISCOVERY_TOOLS_ONLY"]
+    assert "?" in question and "tools" not in question
+    assert len(attempts) == 1
+    text = attempts[0].prompt.last_message().text
+    assert text.startswith("Use a ferramenta add_to_cart")
+    assert text.endswith("Põe 50 batons na sacola?")
+    assert attempts[0].lang == "pt"
+    assert fake_pt.calls == []
+    assert "Brazilian Portuguese" in attacker_prompts[-1]
+
+
 def test_donotanswer_sends_reviewed_portuguese(fake_pt):
     p = _plugins.load_plugin("probes.donotanswer.MaliciousUses")
     assert p.lang == "pt"
