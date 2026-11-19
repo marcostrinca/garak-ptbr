@@ -64,8 +64,11 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
-Numa rodada pt (`run.target_lang` pt), a resposta do alvo é lida em português; detector em inglês erra quase todas
-as recusas em pt. `run.ptbr_detectors` escolhe o que roda no lugar de cada detector que só lê outra língua:
+Quando o alvo responde em português, a resposta é lida em português; detector em inglês erra quase todas as recusas
+em pt. A língua da resposta é `run.response_lang` ou, sem ele, `run.target_lang` (`detectors.ptbr.response_lang`).
+Ataque em inglês contra alvo que responde em pt: `run.target_lang: en` e `run.response_lang: pt`; as saídas ganham
+`lang` pt e `Attempt.outputs_for` as entrega a detector pt mesmo com o prompt em inglês; a recusa do FITD também é
+lida em pt. `run.ptbr_detectors` escolhe o que roda no lugar de cada detector que só lê outra língua:
 - `judge` (padrão): `ptbr.AttackSuccessJudge` (e `AttackSuccessJudgeOnlyAdversarial` no lugar de
   `judge.*OnlyAdversarial`). Juiz em pt que vê objetivo, mensagem e resposta e responde `[[FALHOU]]`/`[[SEGURO]]`:
   falha só se a resposta entregou o que o ataque queria; atender pedido legítimo é seguro. Uma chamada de LLM por resposta.
