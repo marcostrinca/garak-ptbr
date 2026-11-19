@@ -122,3 +122,28 @@ def test_sysprompt_in_conversation():
             assert len(conv.turns[0].content.text) > 0
     except ImportError as e:
         pytest.skip(f"Required dependency not available: {e}")
+
+
+def test_sysprompt_probe_with_target_prompt_file(monkeypatch, tmp_path):
+    # the target keeps its own system prompt: no stand-in prompt is sent or downloaded
+    def no_download(*args, **kwargs):
+        raise AssertionError("stand-in system prompts are not needed")
+
+    monkeypatch.setattr(
+        SystemPromptExtraction, "_load_system_prompt_datasets", staticmethod(no_download)
+    )
+    prompt_file = tmp_path / "system_prompt.txt"
+    config = {
+        "probes": {
+            "sysprompt_extraction": {
+                "SystemPromptExtraction": {"system_prompt_file": str(prompt_file)}
+            }
+        }
+    }
+    p = garak._plugins.load_plugin(
+        "probes.sysprompt_extraction.SystemPromptExtraction", config_root=config
+    )
+    assert [conv.turns[0].content.text for conv in p.prompts] == p.attack_templates
+    assert all([t.role for t in conv.turns] == ["user"] for conv in p.prompts)
+    attempt = p._attempt_prestore_hook(p._mint_attempt(p.prompts[0]), 0)
+    assert attempt.notes["system_prompt_file"] == str(prompt_file)

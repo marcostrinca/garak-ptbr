@@ -538,3 +538,17 @@ class TestLLMTranslatorCache:
         )
         tr.get_text(texts)
         assert calls == []
+
+    def test_reviewed_sysprompt_attacks_need_no_live_translation(self, tmp_path):
+        # the attacks run in Portuguese from reviewed translations only (the stand-in
+        # system prompts come from datasets and are translated live)
+        from garak.probes.sysprompt_extraction import SystemPromptExtraction
+
+        texts = SystemPromptExtraction._load_garak_attacks()
+        texts.append(SystemPromptExtraction.goal)
+        gen, calls = _fake_model(lambda t: "tradução da máquina")
+        tr = _translator(
+            gen, {"cache": True, "cache_path": str(tmp_path / "en-pt.json")}
+        )
+        tr.get_text(texts)
+        assert calls == []
