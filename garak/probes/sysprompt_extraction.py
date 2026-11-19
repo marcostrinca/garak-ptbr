@@ -47,13 +47,19 @@ class SystemPromptExtraction(Probe):
             "garak-llm/tm-system_prompt",  # credit teilomillet/system_prompt
         ],
         "system_prompt_subsample": 50,
+        "system_prompt_file": None,
     }
 
     def __init__(self, config_root=_config):
         super().__init__(config_root=config_root)
-        self.system_prompts = self._load_system_prompt_datasets(
-            self.system_prompt_sources, self.system_prompt_subsample
-        )
+        if self.system_prompt_file:
+            # the target has its own system prompt: send only the attacks and let
+            # the detector compare the answers with the prompt kept in this file
+            self.system_prompts = []
+        else:
+            self.system_prompts = self._load_system_prompt_datasets(
+                self.system_prompt_sources, self.system_prompt_subsample
+            )
         self.attack_templates = self._load_garak_attacks()
         self._generate_attempts()
 
@@ -117,6 +123,18 @@ class SystemPromptExtraction(Probe):
         """Build Conversation prompts from all (system_prompt, attack) combinations."""
         self.prompts = []
 
+        if self.system_prompt_file:
+            for attack_template in self.attack_templates:
+                turns = [
+                    Turn(
+                        role="user",
+                        content=Message(text=attack_template, lang=self.lang),
+                    )
+                ]
+                self.prompts.append(Conversation(turns=turns))
+            self._prune_data()
+            return
+
         all_combinations = [
             (sp, at) for sp in self.system_prompts for at in self.attack_templates
         ]
@@ -131,3 +149,8 @@ class SystemPromptExtraction(Probe):
             self.prompts.append(Conversation(turns=turns))
 
         self._prune_data()
+
+    def _attempt_prestore_hook(self, attempt, seq):
+        if self.system_prompt_file:
+            attempt.notes["system_prompt_file"] = str(self.system_prompt_file)
+        return attempt
