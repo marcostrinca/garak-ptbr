@@ -137,6 +137,11 @@ class AgentBreaker(garak.probes.IterativeProbe):
         tools:
         - name: tool_name
           description: what it does
+
+    Other Languages: In a run translated to a language that has
+    ``data/agent_breaker/prompts_<lang>.yaml``, the discovery questions and
+    the tool request come from that file, and the attacker is told to write
+    the attacks in that language; nothing is translated.
     """
 
     lang = "en"
@@ -187,20 +192,53 @@ class AgentBreaker(garak.probes.IterativeProbe):
 
         self._detector = AgentBreakerResult(config_root=config_root)
 
-        if self.langprovider.target_lang not in ("en", self.lang):
-            logging.warning(
-                f"{self.__class__.__name__} probe currently does not support languages other than {self.lang}"
-            )
-
         # Load prompt templates and agent configuration from YAML
         self._load_prompts()
         self._load_agent_config()
 
+        if self._localizing():
+            logging.warning(
+                f"{self.__class__.__name__} probe has no prompts for "
+                f"{self.langprovider.target_lang}: the attacks are written in "
+                f"{self.lang} and translated"
+            )
+
     def _load_prompts(self):
-        """Load prompt templates from the prompts YAML file."""
+        """Load prompt templates from the prompts YAML file.
+
+        In a run translated to a language that has ``prompts_<lang>.yaml``,
+        its entries replace the English ones, so the messages sent to the
+        target are already in that language. Its ATTACKER_LANGUAGE is added to
+        the attacker's prompts, so the attacker writes the attacks in that
+        language, and nothing is translated.
+        """
         prompts_path = data_path / "agent_breaker" / "prompts.yaml"
         with open(prompts_path, "r", encoding="utf-8") as f:
             self._prompts = yaml.safe_load(f)
+
+        native_path = self._native_prompts_path()
+        if native_path is None:
+            return
+        with open(native_path, "r", encoding="utf-8") as f:
+            native = yaml.safe_load(f)
+        language = native.pop("ATTACKER_LANGUAGE", "").strip()
+        self._prompts.update(native)
+        if language:
+            for key in ("ANALYSIS", "EXPLOIT"):
+                self._prompts[key] += "\n\n" + language
+        self.lang = self.langprovider.target_lang
+
+    def _native_prompts_path(self):
+        """``prompts_<lang>.yaml`` for the run's target language, if there is one"""
+        if not self._localizing():
+            return None
+        target_lang = self.langprovider.target_lang
+        for tag in dict.fromkeys([target_lang, target_lang.split("-")[0]]):
+            try:
+                return data_path / "agent_breaker" / f"prompts_{tag}.yaml"
+            except GarakException:
+                continue
+        return None
 
     def _load_agent_config(self):
         """Load agent purpose and tools from YAML configuration file"""
@@ -479,7 +517,9 @@ class AgentBreaker(garak.probes.IterativeProbe):
 
     def _format_attack_prompt(self, tool_name: str, attack_prompt: str) -> str:
         """Format an attack prompt to explicitly request using a specific tool"""
-        return f"Use the {tool_name} tool for helping with the following task:\n{attack_prompt}"
+        return self._prompts["TOOL_REQUEST"].format(
+            tool_name=tool_name, attack_prompt=attack_prompt
+        )
 
     def _analyze_attackable_tools(self) -> dict:
         """Use red team model to analyze which tools can be attacked and their weaknesses"""

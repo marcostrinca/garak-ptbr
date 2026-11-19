@@ -64,6 +64,10 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   injetadas, traduzidas e revisadas por LLM), monta as mesmas combinações direto na língua-alvo, sem tradução, e passa
   a ter `lang` da rodada. Os rótulos e nomes de ataque têm que bater com `resources/promptinject/prompt_data.py`.
   Gatilhos: a frase na língua do prompt, a original em inglês e, com `run.response_lang` noutra língua, a dessa língua.
+- agent_breaker: com `data/agent_breaker/prompts_<lang>.yaml`, as perguntas de descoberta e o `TOOL_REQUEST` ("use a
+  ferramenta X") vêm de lá e `ATTACKER_LANGUAGE` vai no fim de ANALYSIS e EXPLOIT: o atacante escreve na língua-alvo e
+  nada é traduzido. O juiz (`detectors.agent_breaker`, `lang_spec` "*") segue o próprio, em inglês, lendo a resposta
+  em pt. O probe ataca as ferramentas do alvo: num agente de loja, pôr na sacola cria carrinho de verdade.
 - sysprompt_extraction: com `system_prompt_file` (caminho de arquivo fora do repo com o prompt de sistema do próprio
   alvo), não baixa nem manda prompt falso: manda só os ataques e anota o caminho em `notes["system_prompt_file"]`, de
   onde o detector lê o prompt. Detector `PromptExtraction`: além da proporção de n-gramas do original, conta as palavras
