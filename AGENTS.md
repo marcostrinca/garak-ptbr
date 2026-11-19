@@ -18,8 +18,10 @@ Ao atualizar a base do garak, conferir se esses PRs entraram lá e remover os ch
 Base: NVIDIA/garak PR #1774 (cherry-pick -x), reescrito aqui. Traduz o prompt inteiro numa chamada; código, links,
 base64, hex, HTML e caracteres invisíveis vão mascarados (⟦n⟧) e voltam intactos. Resposta com recusa, sem tradução,
 em outra língua ou de tamanho estranho é rejeitada; depois de `max_retries`, fica o original e entra em `failures`.
-Config (`run.langproviders`): `language: "en,pt"`, `model_type: "llm.LLMTranslator"`, `model_name`,
-`model_config` do gerador (ex.: `generator: nim.NVOpenAIChat`, `uri`, `stop: null` para modelo com raciocínio).
+Config (`run.langproviders`, uma entrada para `en,pt` e outra para `pt,en`, as duas são exigidas):
+`model_type: "llm.LLMTranslator"`, `translation_model_type` (gerador, padrão `openai.OpenAICompatible`),
+`translation_model_name` e `translation_model_config` (`uri`, `max_tokens`, `suppressed_params: [stop]` para modelo com
+raciocínio). Sem `translation_model_config.uri`, o tradutor tenta `localhost:11434` e a probe não carrega.
 Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas numa amostra; o Ultra recusou 10%).
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
 (chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection.
