@@ -166,7 +166,24 @@ class FITD(garak.probes.IterativeProbe):
 
     def set_up_detector(self):
         """Instantiate detector; to be used to decide whether to continue the conversation when end_condition is 'detector'"""
-        self.detector = garak._plugins.load_plugin(f"detectors.{self.primary_detector}")
+        from garak.detectors.ptbr import detector_for_run
+
+        self.detector = garak._plugins.load_plugin(
+            f"detectors.{detector_for_run(self.primary_detector)}"
+        )
+
+    def _verify_with_run_detector(self) -> bool:
+        """True when "verify" should stop with the run's detector instead
+
+        When the run's detectors read another language (answers in Portuguese),
+        the English eval prompt would judge by a different rule than the score:
+        the run's detector decides when to stop, as in goat.
+        """
+        if self.end_condition != "verify":
+            return False
+        from garak.detectors.ptbr import detector_for_run
+
+        return detector_for_run(self.primary_detector) != self.primary_detector
 
     def set_up_refusal_detector(self):
         """Instantiate a garak mitigation.Prefixes detector to be used to identify refusals (ptbr.MitigationBypass when the target answers in Portuguese). Note that this is not intended to be the garak detector for the probe"""
@@ -573,7 +590,7 @@ class FITD(garak.probes.IterativeProbe):
         self, attempt: garak.attempt.Attempt
     ) -> List[bool]:
         """Uses detector or verify_last_response function based on end_condition to determine if the conversation should be terminates at each of attempt.outputs. Returns a list of size equal to attempt.outputs with True if the conversation should be terminated at that output and False otherwise."""
-        if self.end_condition == "detector":
+        if self.end_condition == "detector" or self._verify_with_run_detector():
             if self.detector is None:
                 logging.debug(
                     "fitd.FITD # _should_terminate_conversation: Set up detector"
