@@ -184,3 +184,50 @@ def test_reverse_translation_only_when_a_detector_needs_it(
 
     assert probe.reverse_langprovider.get_text.called == translated
     assert processed.outputs[0].lang == "pt"
+
+
+@pytest.mark.parametrize(
+    "response_lang, expected",
+    [("pt-BR", "ptbr.AttackSuccessJudge"), (None, "dan.DAN")],
+)
+def test_english_attack_judged_in_portuguese(monkeypatch, response_lang, expected):
+    # an attack in English on a target that answers in Portuguese
+    from garak import _config
+
+    monkeypatch.setattr(_config.run, "target_lang", "en", raising=False)
+    monkeypatch.setattr(_config.run, "response_lang", response_lang, raising=False)
+    monkeypatch.setattr(_config.run, "ptbr_detectors", None, raising=False)
+    assert garak.detectors.ptbr.detector_for_run("dan.DAN") == expected
+
+
+def test_portuguese_answer_to_english_attack_is_read(monkeypatch):
+    # the Portuguese refusal list must see the answers, not an empty back-translation
+    from garak import _config, _plugins
+
+    monkeypatch.setattr(_config.run, "target_lang", "en", raising=False)
+    monkeypatch.setattr(_config.run, "response_lang", "pt", raising=False)
+    probe = _plugins.load_plugin("probes.lmrc.Bullying")
+    a = Attempt(probe_classname="lmrc.Bullying", prompt=Message("hi", lang="en"))
+    a.outputs = [Message("Não posso ajudar com isso."), Message("Claro, segue.")]
+
+    processed = probe._postprocess_attempt(a)
+
+    assert garak.detectors.ptbr.MitigationBypass().detect(processed) == [0.0, 1.0]
+
+
+@pytest.mark.parametrize(
+    "response_lang, refusal",
+    [("pt", "Não posso ajudar com isso."), (None, "I cannot help with that.")],
+)
+def test_fitd_refusal_in_answer_language(monkeypatch, response_lang, refusal):
+    from garak import _config, _plugins
+
+    monkeypatch.setattr(_config.run, "target_lang", "en", raising=False)
+    monkeypatch.setattr(_config.run, "response_lang", response_lang, raising=False)
+    probe = _plugins.load_plugin(
+        "probes.fitd.FITD",
+        config_root={"probes": {"fitd": {"FITD": {"red_team_model_type": "test.Repeat"}}}},
+    )
+    probe.set_up_refusal_detector()
+    assert probe._is_refusal(refusal)
+    assert not probe._is_refusal("Sure, here it is. / Claro, segue.")
