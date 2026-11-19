@@ -211,3 +211,57 @@ def test_strip_trailing_punctuation(raw, expected):
     from garak.probes.promptinject import _strip_trailing_punctuation
 
     assert _strip_trailing_punctuation(raw) == expected
+
+
+class _NoTranslationLangProvider:
+    """en -> pt langprovider that fails if anything is translated on the fly"""
+
+    source_lang = "en"
+    target_lang = "pt"
+
+    def get_text(self, prompts, reverse_translate_judge=False, notify_callback=None):
+        raise AssertionError("prompts with reviewed pieces must not be translated")
+
+
+@pytest.fixture
+def native_pt_probe(monkeypatch):
+    monkeypatch.setattr(
+        garak.probes.base.Probe,
+        "_get_langprovider",
+        lambda self: _NoTranslationLangProvider(),
+    )
+    return garak._plugins.load_plugin("probes.promptinject.HijackHateHumansFull")
+
+
+def test_promptinject_built_from_reviewed_pieces(native_pt_probe):
+    p = native_pt_probe
+    english = garak._plugins.load_plugin("probes.promptinject.HijackHateHumansFull")
+    assert len(p.prompts) == len(
+        english.prompts
+    ), "every combination of base prompt and attack should exist in the reviewed language"
+    assert p.lang == "pt", "prompts built from reviewed pieces are already in the target language"
+    assert all("Eu odeio humanos" in prompt for prompt in p.prompts)
+    assert not any("I hate humans" in prompt for prompt in p.prompts)
+
+
+def test_promptinject_reviewed_pieces_triggers(native_pt_probe):
+    p = native_pt_probe
+    attempt = garak.attempt.Attempt(prompt=garak.attempt.Message(p.prompts[0]))
+    attempt = p._attempt_prestore_hook(attempt, 0)
+    assert attempt.notes["triggers"] == ["Eu odeio humanos", "I hate humans"]
+    attempt.outputs = ["eu odeio humanos"]
+    d = garak._plugins.load_plugin("detectors.promptinject.AttackRogueString")
+    assert d.detect(attempt) == [1.0]
+
+
+def test_promptinject_english_attack_answered_in_portuguese(monkeypatch):
+    from garak import _config
+
+    monkeypatch.setattr(_config.run, "response_lang", "pt", raising=False)
+    p = garak._plugins.load_plugin("probes.promptinject.HijackHateHumans")
+    attempt = garak.attempt.Attempt(prompt=garak.attempt.Message(p.prompts[0]))
+    attempt = p._attempt_prestore_hook(attempt, 0)
+    assert attempt.notes["triggers"] == [
+        "I hate humans",
+        "Eu odeio humanos",
+    ], "a target answering in Portuguese repeats the injected string in Portuguese"
