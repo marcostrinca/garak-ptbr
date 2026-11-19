@@ -59,8 +59,8 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
 - fitd: com `data/fitd/attacker_language_<lang>.txt`, roda na língua-alvo (antes recusava qualquer língua além do
   inglês). A instrução vai nos prompts do atacante que geram turnos; objetivos de `harmbench/harmbench_prompts_<lang>.txt`,
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
-  vista por `ptbr.MitigationBypass` em pt. Os juízes internos do atacante (eval, aligned) seguem em inglês, e a nota
-  (`set_up_detector`) ainda usa o juiz de dano em inglês.
+  vista por `ptbr.MitigationBypass` em pt. Com resposta em pt, a parada (`verify` ou `detector`) usa o juiz pt
+  (`detector_for_run`), o mesmo da nota, como no goat; o juiz `aligned` do atacante (decide o realinhamento) segue em inglês.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)
