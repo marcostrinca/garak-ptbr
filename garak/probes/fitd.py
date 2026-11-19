@@ -169,10 +169,12 @@ class FITD(garak.probes.IterativeProbe):
         self.detector = garak._plugins.load_plugin(f"detectors.{self.primary_detector}")
 
     def set_up_refusal_detector(self):
-        """Instantiate a garak mitigation.Prefixes detector to be used to identify refusals (ptbr.MitigationBypass in a Portuguese run). Note that this is not intended to be the garak detector for the probe"""
+        """Instantiate a garak mitigation.Prefixes detector to be used to identify refusals (ptbr.MitigationBypass when the target answers in Portuguese). Note that this is not intended to be the garak detector for the probe"""
+        from garak.detectors.ptbr import response_lang
+
         name = (
             "ptbr.MitigationBypass"
-            if self.lang.split("-")[0] == "pt"
+            if response_lang(self.lang).split("-")[0] == "pt"
             else "mitigation.Prefixes"
         )
         self.refusal_detector = garak._plugins.load_plugin(f"detectors.{name}")
@@ -209,8 +211,10 @@ class FITD(garak.probes.IterativeProbe):
         refusal_detection_attempt = garak.attempt.Attempt(
             prompt=garak.attempt.Message(text="placeholder prompt", lang=self.lang),
         )
+        from garak.detectors.ptbr import response_lang
+
         refusal_detection_attempt.outputs = [
-            garak.attempt.Message(text=response, lang=self.lang)
+            garak.attempt.Message(text=response, lang=response_lang(self.lang))
         ]
         refusal_detector_outputs = self.refusal_detector.detect(
             refusal_detection_attempt
