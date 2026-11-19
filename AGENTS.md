@@ -22,7 +22,7 @@ Config (`run.langproviders`): `language: "en,pt"`, `model_type: "llm.LLMTranslat
 `model_config` do gerador (ex.: `generator: nim.NVOpenAIChat`, `uri`, `stop: null` para modelo com raciocínio).
 Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas numa amostra; o Ultra recusou 10%).
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
-(chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection e promptinject.
+(chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection.
 lmrc e misleading estão inteiros no revisado (prompts, triggers e goal): numa rodada pt não chamam o tradutor.
 Se o garak oficial mudar um desses textos, `test_reviewed_probes_need_no_live_translation` (tests/langservice/test_llm.py)
 falha: traduzir e revisar o texto novo e pôr no revisado.
@@ -56,6 +56,10 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   (`detector_for_run`), o mesmo da nota, salvo `custom_judge_prompt`.
 - donotanswer: com `data/donotanswer/<categoria>_<lang>.jsonl`, envia essas perguntas (mesma ordem e `intent` do
   original) sem tradução e passa a ter `lang` da rodada. As de pt foram traduzidas e revisadas por LLM em dois passes.
+- promptinject: com `data/promptinject/prompt_data_<lang>.json` (peças em pt: tarefas base, ataques e frases
+  injetadas, traduzidas e revisadas por LLM), monta as mesmas combinações direto na língua-alvo, sem tradução, e passa
+  a ter `lang` da rodada. Os rótulos e nomes de ataque têm que bater com `resources/promptinject/prompt_data.py`.
+  Gatilhos: a frase na língua do prompt, a original em inglês e, com `run.response_lang` noutra língua, a dessa língua.
 - fitd: com `data/fitd/attacker_language_<lang>.txt`, roda na língua-alvo (antes recusava qualquer língua além do
   inglês). A instrução vai nos prompts do atacante que geram turnos; objetivos de `harmbench/harmbench_prompts_<lang>.txt`,
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
