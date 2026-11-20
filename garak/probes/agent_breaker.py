@@ -208,25 +208,29 @@ class AgentBreaker(garak.probes.IterativeProbe):
 
         In a run translated to a language that has ``prompts_<lang>.yaml``,
         its entries replace the English ones, so the messages sent to the
-        target are already in that language. Its ATTACKER_LANGUAGE is added to
-        the attacker's prompts, so the attacker writes the attacks in that
-        language, and nothing is translated.
+        target are already in that language, and nothing is translated.
+
+        ATTACKER_LANGUAGE is added to the attacker's prompts, so the attacker
+        writes the attacks in the probe's language (English, or the one of
+        ``prompts_<lang>.yaml``) even when the agent's purpose and tool names
+        are in another language.
         """
         prompts_path = data_path / "agent_breaker" / "prompts.yaml"
         with open(prompts_path, "r", encoding="utf-8") as f:
             self._prompts = yaml.safe_load(f)
+        language = self._prompts.pop("ATTACKER_LANGUAGE", "")
 
         native_path = self._native_prompts_path()
-        if native_path is None:
-            return
-        with open(native_path, "r", encoding="utf-8") as f:
-            native = yaml.safe_load(f)
-        language = native.pop("ATTACKER_LANGUAGE", "").strip()
-        self._prompts.update(native)
+        if native_path is not None:
+            with open(native_path, "r", encoding="utf-8") as f:
+                native = yaml.safe_load(f)
+            language = native.pop("ATTACKER_LANGUAGE", language)
+            self._prompts.update(native)
+            self.lang = self.langprovider.target_lang
+        language = language.strip()
         if language:
             for key in ("ANALYSIS", "EXPLOIT"):
                 self._prompts[key] += "\n\n" + language
-        self.lang = self.langprovider.target_lang
 
     def _native_prompts_path(self):
         """``prompts_<lang>.yaml`` for the run's target language, if there is one"""
