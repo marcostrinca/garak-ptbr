@@ -249,6 +249,29 @@ class TestProbeOrchestration:
             probe._create_init_attempts()
             mock_discover.assert_not_called()
 
+    def test_attacker_writes_in_probe_language(self):
+        # agent described in another language: the attacker still writes in English
+        probe = _make_probe(
+            agent_config={
+                "agent_purpose": "Assistente de compras",
+                "tools": [{"name": "esvaziar_sacola", "description": "Esvazia a sacola"}],
+            }
+        )
+        attacker_prompts = []
+
+        def attacker(prompt, model=None):
+            attacker_prompts.append(prompt)
+            return '{"tool_analyses": {"esvaziar_sacola": {"attack_prompts": ["x"]}}}'
+
+        with (
+            patch.object(probe, "_setup_red_team_model"),
+            patch.object(probe, "_get_model_response", side_effect=attacker),
+            patch.object(probe, "_attack_single_tool", return_value=[]),
+        ):
+            list(probe._create_init_attempts())
+        assert probe.lang == "en"
+        assert "in English" in attacker_prompts[0]
+
     def test_returns_empty_when_no_tools(self):
         probe = _make_probe(agent_config={"agent_purpose": "", "tools": []})
         with (
