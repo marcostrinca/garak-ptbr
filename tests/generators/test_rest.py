@@ -606,3 +606,59 @@ def test_rest_mtls_pickle_roundtrip(real_mtls_cert_files):
     assert isinstance(
         adapter, _MtlsAdapter
     ), "Reconstructed session must have an _MtlsAdapter mounted on 'https://'"
+
+
+def _session_generator(requests_mock):
+    """Endpoint that answers with the session it got, or a new one"""
+    sessions = iter(["s1", "s2", "s3"])
+
+    def answer(request, context):
+        body = json.loads(request.body)
+        session = body.get("chat_id") or next(sessions)
+        return json.dumps({"text": f"ok {body['message']}", "chat_id": session})
+
+    requests_mock.post(DEFAULT_URI, text=answer)
+    rest_config = _config.plugins.generators["rest"]["RestGenerator"]
+    rest_config["req_template_json_object"] = {
+        "message": "$INPUT",
+        "chat_id": "$SESSION",
+    }
+    rest_config["response_json"] = True
+    rest_config["response_json_field"] = "text"
+    rest_config["session_json_field"] = "$.chat_id"
+    return RestGenerator()
+
+
+def _conv(*user_turns):
+    turns = []
+    for text in user_turns:
+        turns += [Turn("user", Message(text)), Turn("assistant", Message("r"))]
+    return Conversation(turns[:-1])
+
+
+def _sent(requests_mock):
+    return [json.loads(r.body) for r in requests_mock.request_history]
+
+
+@pytest.mark.usefixtures("set_rest_config")
+def test_json_rest_session_keeps_conversation(requests_mock):
+    generator = _session_generator(requests_mock)
+    generator._call_model(_conv("a"))
+    output = generator._call_model(_conv("a", "b"))
+    assert output == [Message("ok b")]
+    assert _sent(requests_mock) == [
+        {"message": "a"},
+        {"message": "b", "chat_id": "s1"},
+    ]
+
+
+@pytest.mark.usefixtures("set_rest_config")
+def test_json_rest_session_replays_when_conversation_branches(requests_mock):
+    generator = _session_generator(requests_mock)
+    generator._call_model(_conv("a"))
+    generator._call_model(_conv("a", "b"))
+    generator._call_model(_conv("a", "c"))  # back to "a", another way
+    assert _sent(requests_mock)[2:] == [
+        {"message": "a"},
+        {"message": "c", "chat_id": "s2"},
+    ]

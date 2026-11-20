@@ -48,6 +48,7 @@ class RestGenerator(Generator):
         "client_cert": None,
         "client_key": None,
         "client_key_passphrase_env_var": None,
+        "session_json_field": None,
     }
 
     ENV_VAR = "REST_API_KEY"
@@ -81,6 +82,7 @@ class RestGenerator(Generator):
         "client_cert",
         "client_key",
         "client_key_passphrase_env_var",
+        "session_json_field",
     )
 
     def __init__(self, uri=None, config_root=_config):
@@ -92,6 +94,9 @@ class RestGenerator(Generator):
         self.key_env_var = self.ENV_VAR if hasattr(self, "ENV_VAR") else None
         self.client_key_passphrase = None
         self._extracted_a_response = False
+        # conversation (user turns) -> session the target keeps it in; see _call_model
+        self._sessions = {}
+        self._continued = set()
 
         # load configuration since super.__init__ has not been called
         self._load_config(config_root)
@@ -185,6 +190,15 @@ class RestGenerator(Generator):
             except JsonPathParserError as e:
                 logging.critical(
                     "Couldn't parse response_json_field %s", self.response_json_field
+                )
+                raise e
+
+        if self.session_json_field:
+            try:
+                self.session_expr = jsonpath_ng.parse(self.session_json_field)
+            except JsonPathParserError as e:
+                logging.critical(
+                    "Couldn't parse session_json_field %s", self.session_json_field
                 )
                 raise e
 
@@ -295,27 +309,92 @@ class RestGenerator(Generator):
         logging.error(reason)
         return [None]
 
-    @backoff.on_exception(
-        backoff.fibo, (RateLimitHit, GeneratorBackoffTrigger), max_value=70
-    )
     def _call_model(
         self, prompt: Conversation, generations_this_call: int = 1
     ) -> List[Union[Message, None]]:
         """Individual call to get a rest from the REST API
 
-        :param prompt: the input to be placed into the request template and sent to the endpoint
-        :type prompt: str
-        """
+        Without ``session_json_field`` only the last message is sent. With it,
+        the session the endpoint returns (a chat id) goes back in the
+        next turn of the same conversation, through ``$SESSION`` in the request
+        template or headers. When a probe goes back to an earlier point of a
+        conversation and takes another way (FITD retries a refused turn), or
+        sends turns the endpoint never saw, the earlier user turns are sent
+        again on a new session first, so the target sees the same conversation
+        as the probe. Needs attempts run one at a time (no parallel_attempts).
 
-        # should this support a serialized Conversation?
+        :param prompt: the input to be placed into the request template and sent to the endpoint
+        :type prompt: Conversation
+        """
+        if not self.session_json_field:
+            return self._send(prompt.last_message().text)[0]
+
+        said = tuple(t.content.text for t in prompt.turns if t.role == "user")
+        before = said[:-1]
+        if before and (before not in self._sessions or before in self._continued):
+            session = None
+            for i, text in enumerate(before):
+                _, session = self._send(text, session)
+                self._sessions[before[: i + 1]] = session
+        self._continued.add(before)
+        output, session = self._send(said[-1], self._sessions.get(before))
+        self._sessions[said] = session
+        return output
+
+    def _session_template(self, template: str, session) -> str:
+        """Fill $SESSION; with no session yet, a JSON key whose value is
+        exactly "$SESSION" is left out of the request"""
+        if "$SESSION" not in template:
+            return template
+        if session is not None:
+            return template.replace("$SESSION", self.escape_function(str(session)))
+        try:
+            request_object = json.loads(template)
+        except ValueError:
+            return template.replace("$SESSION", "")
+
+        def drop(item):
+            if isinstance(item, dict):
+                return {k: drop(v) for k, v in item.items() if v != "$SESSION"}
+            if isinstance(item, list):
+                return [drop(v) for v in item]
+            return item
+
+        return json.dumps(drop(request_object))
+
+    def _read_session(self, resp, session):
+        """Session the endpoint returned, or the one already in use"""
+        try:
+            found = self.session_expr.find(json.loads(resp.content))
+        except ValueError:
+            found = []
+        if found and found[0].value not in (None, ""):
+            return found[0].value
+        if session is None:
+            logging.warning(
+                "RestGenerator session_json_field %r found no session in the response",
+                self.session_json_field,
+            )
+        return session
+
+    @backoff.on_exception(
+        backoff.fibo, (RateLimitHit, GeneratorBackoffTrigger), max_value=70
+    )
+    def _send(self, text: str, session=None) -> tuple:
+        """Send one message; returns (outputs, session)"""
+
         request_data = self._populate_template(
-            self.req_template, prompt.last_message().text
+            self._session_template(self.req_template, session), text
         )
 
-        request_headers = dict(self.headers)
+        request_headers = {}
         for k, v in self.headers.items():
+            if "$SESSION" in v and session is None:
+                continue
             # why does this provide the prompt to fill out headers?
-            request_headers[k] = self._populate_template(v, prompt.last_message().text)
+            request_headers[k] = self._populate_template(
+                self._session_template(v, session), text
+            )
 
         # the prompt should not be sent via data when using a GET request. Prompt should be
         # serialized as parameters, in general a method could be created to add
@@ -356,7 +435,7 @@ class RestGenerator(Generator):
                 resp.reason,
                 self.uri,
             )
-            return [None]
+            return [None], session
 
         if resp.status_code in self.ratelimit_codes:
             raise RateLimitHit(
@@ -379,6 +458,12 @@ class RestGenerator(Generator):
                 raise GeneratorBackoffTrigger(error_msg)
             raise ConnectionError(error_msg)
 
+        if self.session_json_field:
+            session = self._read_session(resp, session)
+        return self._parse_response(resp), session
+
+    def _parse_response(self, resp) -> List[Union[Message, None]]:
+        """Outputs from the endpoint response"""
         if not self.response_json:
             return [Message(str(resp.text))]
 

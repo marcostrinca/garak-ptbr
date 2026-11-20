@@ -22,6 +22,7 @@ Uses the following options from ``_config.plugins.generators["rest.RestGenerator
 * ``client_cert`` - (optional) Path to a PEM-encoded client certificate file for mTLS. If the file contains both the certificate and private key, ``client_key`` is not required.
 * ``client_key`` - (optional) Path to the client private key file for mTLS. Must be set if ``client_cert`` does not contain the key. Cannot be set without ``client_cert``.
 * ``client_key_passphrase_env_var`` - (optional) Name of an environment variable holding the passphrase for an encrypted ``client_key``. The passphrase is never read from config files. If set, the named env var must be defined or startup will fail.
+* ``session_json_field`` - (optional) JSONPath to the session or chat id in the endpoint's JSON response. When set, multi-turn conversations stay on one session: the id goes back in the next turn through ``$SESSION`` (see below).
 
 Templates can be either a string or a JSON-serialisable Python object.
 Instance of ``$INPUT`` here are replaced with the prompt; instances of ``$KEY``
@@ -29,6 +30,17 @@ are replaced with the specified API key. If no key is needed, just don't
 put ``$KEY`` in a template.
 
 The ``$INPUT`` and ``$KEY`` placeholders can also be specified in header values.
+
+Multi-turn probes (``goat``, ``fitd``, ``agent_breaker``) need the target to
+remember the earlier turns. By default only the last message is sent. For an
+endpoint that keeps the chat by an id it returns, set ``session_json_field`` to
+that id and put ``$SESSION`` where the request carries it, e.g.
+``"req_template_json_object": {"message": "$INPUT", "chat_id": "$SESSION"}``
+with ``"session_json_field": "$.chat_id"``. The first turn has no id yet: a
+JSON key whose value is exactly ``"$SESSION"`` is left out, and so is a header
+holding ``$SESSION``. When a probe goes back to an earlier turn and takes
+another way, the earlier user turns are sent again on a new session first.
+Run these probes with ``parallel_attempts`` off.
 
 If we want to call an endpoint where the API key is defined in the value
 of an ``X-Authorization`` header, sending and receiving JSON where the prompt
