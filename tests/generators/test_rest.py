@@ -705,3 +705,19 @@ def test_rest_preflight_every_request_blocks_send(requests_mock, tmp_path):
     with pytest.raises(TargetStopped):
         generator._call_model(_conv("b"))
     assert requests_mock.call_count == 1
+
+
+@pytest.mark.usefixtures("set_rest_config")
+def test_json_rest_join_reply_parts(requests_mock):
+    requests_mock.post(
+        DEFAULT_URI,
+        text=json.dumps(
+            {"outputs": [{"text": "Hi"}, {"image": "x"}, {"label": "Buy"}]}
+        ),
+    )
+    rest_config = _config.plugins.generators["rest"]["RestGenerator"]
+    rest_config["response_json"] = True
+    rest_config["response_json_field"] = "$.outputs..[text,label]"
+    rest_config["response_json_join"] = "\n"
+    generator = RestGenerator()
+    assert generator.generate(_conv("a")) == [Message("Hi\nBuy")]
