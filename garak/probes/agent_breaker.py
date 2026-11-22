@@ -138,6 +138,9 @@ class AgentBreaker(garak.probes.IterativeProbe):
         - name: tool_name
           description: what it does
 
+    The same ``agent_purpose`` and ``tools`` can also be set as probe options
+    in the run config; each one set there replaces the one from the file.
+
     Other Languages: In a run translated to a language that has
     ``data/agent_breaker/prompts_<lang>.yaml``, the discovery questions and
     the tool request come from that file, and the attacker is told to write
@@ -174,6 +177,10 @@ class AgentBreaker(garak.probes.IterativeProbe):
         "max_calls_per_conv": 50,
         # Path to agent configuration YAML file (relative to garak/data/)
         "agent_config_file": "agent_breaker/agent.yaml",
+        # Agent purpose and tools given in the run config; each one set here
+        # replaces the same key from agent_config_file
+        "agent_purpose": None,
+        "tools": None,
         # Maximum number of exploit attempts per tool before moving to next target
         "max_attempts_per_tool": 5,
         # Threshold for considering an attack successful
@@ -263,6 +270,15 @@ class AgentBreaker(garak.probes.IterativeProbe):
 
         if not self.agent_config:
             self.agent_config = {}
+
+        if self.agent_purpose is not None:
+            self.agent_config["agent_purpose"] = self.agent_purpose
+        if self.tools is not None:
+            if not isinstance(self.tools, list):
+                msg = "AgentBreaker `tools` must be a list of {name, description}"
+                logging.error(msg)
+                raise GarakException(msg)
+            self.agent_config["tools"] = self.tools
 
         self.agent_config.setdefault("agent_purpose", "")
         self.agent_config.setdefault("tools", [])
