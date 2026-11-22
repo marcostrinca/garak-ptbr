@@ -23,6 +23,12 @@ Uses the following options from ``_config.plugins.generators["rest.RestGenerator
 * ``client_key`` - (optional) Path to the client private key file for mTLS. Must be set if ``client_cert`` does not contain the key. Cannot be set without ``client_cert``.
 * ``client_key_passphrase_env_var`` - (optional) Name of an environment variable holding the passphrase for an encrypted ``client_key``. The passphrase is never read from config files. If set, the named env var must be defined or startup will fail.
 * ``session_json_field`` - (optional) JSONPath to the session or chat id in the endpoint's JSON response. When set, multi-turn conversations stay on one session: the id goes back in the next turn through ``$SESSION`` (see below).
+* ``preflight_command`` - (optional) Command run before the first request (a list is run as is, a string through the shell). Nothing is sent unless it exits 0 and, if set, its output matches ``preflight_expect``.
+* ``preflight_expect`` - (optional) Regex the preflight output must match.
+* ``preflight_every_request`` - (optional) Run the preflight before every request, not only the first. Default ``False``.
+* ``preflight_timeout`` - (optional) Seconds before the preflight command counts as failed. Default 60.
+* ``stop_patterns`` - (optional) Regexes searched in the raw response body. A match writes ``stop_file`` and stops the run.
+* ``stop_file`` - Required with ``stop_patterns``. While this file exists, nothing is sent to the target, in this run or the next ones.
 
 Templates can be either a string or a JSON-serialisable Python object.
 Instance of ``$INPUT`` here are replaced with the prompt; instances of ``$KEY``
@@ -41,6 +47,15 @@ JSON key whose value is exactly ``"$SESSION"`` is left out, and so is a header
 holding ``$SESSION``. When a probe goes back to an earlier turn and takes
 another way, the earlier user turns are sent again on a new session first.
 Run these probes with ``parallel_attempts`` off.
+
+Two guards help when the target can act on real systems (orders, carts,
+messages). ``preflight_command`` checks the target is in a safe mode before
+anything is sent, e.g. a test or simulation flag in its log; with
+``preflight_every_request`` the check repeats before each request, so a
+restart into another mode is caught. ``stop_patterns`` catch a response that
+shows a real action happened: the run stops with ``TargetStopped`` and
+``stop_file`` records the time and the matches. Remove the file only after
+looking at what happened.
 
 If we want to call an endpoint where the API key is defined in the value
 of an ``X-Authorization`` header, sending and receiving JSON where the prompt
