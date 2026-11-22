@@ -8,7 +8,7 @@ import pytest
 
 from garak import _config, _plugins
 from garak.attempt import Message, Turn, Conversation
-from garak.exception import BadGeneratorException, GarakException
+from garak.exception import BadGeneratorException, GarakException, TargetStopped
 from garak.generators.rest import RestGenerator
 
 DEFAULT_NAME = "REST Test"
@@ -662,3 +662,46 @@ def test_json_rest_session_replays_when_conversation_branches(requests_mock):
         {"message": "a"},
         {"message": "c", "chat_id": "s2"},
     ]
+
+
+@pytest.mark.usefixtures("set_rest_config")
+def test_rest_stop_pattern_stops_all_later_sends(requests_mock, tmp_path):
+    stop_file = tmp_path / "stop"
+    bodies = iter(
+        [
+            '{"text": "fake", "button": "https://shop/cart?id=0000000000000000ab"}',
+            '{"text": "real", "button": "https://shop/cart?id=1234567890abcdefab"}',
+        ]
+    )
+    requests_mock.post(DEFAULT_URI, text=lambda request, context: next(bodies))
+    rest_config = _config.plugins.generators["rest"]["RestGenerator"]
+    rest_config["response_json"] = True
+    rest_config["response_json_field"] = "text"
+    # the pattern sits outside the extracted field, in the raw body
+    rest_config["stop_patterns"] = [r"cart\?id=(?!0{16})[0-9a-f]{18}"]
+    rest_config["stop_file"] = str(stop_file)
+    generator = RestGenerator()
+    assert generator._call_model(_conv("a")) == [Message("fake")]
+    with pytest.raises(TargetStopped):
+        generator._call_model(_conv("b"))
+    assert "1234567890abcdefab" in stop_file.read_text()
+    with pytest.raises(TargetStopped):
+        RestGenerator()._call_model(_conv("c"))
+    assert requests_mock.call_count == 2
+
+
+@pytest.mark.usefixtures("set_rest_config")
+def test_rest_preflight_every_request_blocks_send(requests_mock, tmp_path):
+    state = tmp_path / "state"
+    state.write_text("safe mode on")
+    requests_mock.post(DEFAULT_URI, text=DEFAULT_TEXT_RESPONSE)
+    rest_config = _config.plugins.generators["rest"]["RestGenerator"]
+    rest_config["preflight_command"] = ["cat", str(state)]
+    rest_config["preflight_expect"] = "safe mode on"
+    rest_config["preflight_every_request"] = True
+    generator = RestGenerator()
+    generator._call_model(_conv("a"))
+    state.write_text("safe mode off")
+    with pytest.raises(TargetStopped):
+        generator._call_model(_conv("b"))
+    assert requests_mock.call_count == 1

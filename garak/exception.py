@@ -26,6 +26,10 @@ class BadGeneratorException(PluginConfigurationError):
     """Generator invocation requested is not usable"""
 
 
+class TargetStopped(GarakException):
+    """A target safety check failed or tripped: nothing more is sent to the target"""
+
+
 class RateLimitHit(Exception):
     """Raised when a rate limiting response is returned"""
 

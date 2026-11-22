@@ -9,7 +9,10 @@ Generic Module for REST API connections
 import json
 import logging
 import os
+import re
 import ssl
+import subprocess
+import time
 from typing import List, Union
 import requests
 
@@ -24,6 +27,7 @@ from garak.exception import (
     BadGeneratorException,
     RateLimitHit,
     GeneratorBackoffTrigger,
+    TargetStopped,
 )
 from garak.generators.base import Generator
 
@@ -49,6 +53,12 @@ class RestGenerator(Generator):
         "client_key": None,
         "client_key_passphrase_env_var": None,
         "session_json_field": None,
+        "preflight_command": None,
+        "preflight_expect": None,
+        "preflight_every_request": False,
+        "preflight_timeout": 60,
+        "stop_patterns": [],
+        "stop_file": None,
     }
 
     ENV_VAR = "REST_API_KEY"
@@ -83,6 +93,12 @@ class RestGenerator(Generator):
         "client_key",
         "client_key_passphrase_env_var",
         "session_json_field",
+        "preflight_command",
+        "preflight_expect",
+        "preflight_every_request",
+        "preflight_timeout",
+        "stop_patterns",
+        "stop_file",
     )
 
     def __init__(self, uri=None, config_root=_config):
@@ -97,6 +113,7 @@ class RestGenerator(Generator):
         # conversation (user turns) -> session the target keeps it in; see _call_model
         self._sessions = {}
         self._continued = set()
+        self._preflight_passed = False
 
         # load configuration since super.__init__ has not been called
         self._load_config(config_root)
@@ -201,6 +218,14 @@ class RestGenerator(Generator):
                     "Couldn't parse session_json_field %s", self.session_json_field
                 )
                 raise e
+
+        if isinstance(self.stop_patterns, str):
+            self.stop_patterns = [self.stop_patterns]
+        self._stop_regexes = [re.compile(p) for p in self.stop_patterns]
+        if self._stop_regexes and not self.stop_file:
+            raise BadGeneratorException(
+                "`stop_patterns` needs `stop_file`, the file that keeps the run stopped once a pattern matches"
+            )
 
         super().__init__(self.name, config_root=config_root)
 
@@ -383,6 +408,12 @@ class RestGenerator(Generator):
     def _send(self, text: str, session=None) -> tuple:
         """Send one message; returns (outputs, session)"""
 
+        self._check_stop_file()
+        if self.preflight_command and (
+            self.preflight_every_request or not self._preflight_passed
+        ):
+            self._preflight()
+
         request_data = self._populate_template(
             self._session_template(self.req_template, session), text
         )
@@ -428,6 +459,8 @@ class RestGenerator(Generator):
             )
             raise BadGeneratorException from uee
 
+        self._check_stop_patterns(resp.text)
+
         if resp.status_code in self.skip_codes:
             logging.debug(
                 "REST skip prompt: %s - %s, uri: %s",
@@ -461,6 +494,58 @@ class RestGenerator(Generator):
         if self.session_json_field:
             session = self._read_session(resp, session)
         return self._parse_response(resp), session
+
+    def _check_stop_file(self):
+        if self.stop_file and os.path.exists(self.stop_file):
+            raise TargetStopped(
+                f"{self.stop_file} exists: a stop pattern matched earlier. Nothing sent; check the file before removing it."
+            )
+
+    def _preflight(self):
+        """Run preflight_command; send nothing unless it exits 0 and prints preflight_expect"""
+        try:
+            done = subprocess.run(
+                self.preflight_command,
+                shell=isinstance(self.preflight_command, str),
+                capture_output=True,
+                text=True,
+                timeout=self.preflight_timeout,
+            )
+        except (OSError, subprocess.TimeoutExpired) as e:
+            raise TargetStopped(f"REST preflight command failed: {e!r}") from e
+        expected = self.preflight_expect is None or re.search(
+            self.preflight_expect, done.stdout, re.MULTILINE
+        )
+        if done.returncode != 0 or not expected:
+            logging.error(
+                "REST preflight failed (exit %s), stdout tail: %r",
+                done.returncode,
+                done.stdout[-500:],
+            )
+            raise TargetStopped(
+                "REST preflight check failed: nothing sent to the target"
+            )
+        self._preflight_passed = True
+
+    def _check_stop_patterns(self, body: str):
+        matches = [m.group(0) for r in self._stop_regexes for m in r.finditer(body)]
+        if not matches:
+            return
+        with open(self.stop_file, "a", encoding="utf-8") as f:
+            f.write(
+                json.dumps(
+                    {
+                        "time": time.strftime("%Y-%m-%d %H:%M:%S"),
+                        "uri": self.uri,
+                        "matches": [m[:200] for m in matches[:5]],
+                    },
+                    ensure_ascii=False,
+                )
+                + "\n"
+            )
+        raise TargetStopped(
+            f"stop pattern matched in the target response ({len(matches)}): run stopped, see {self.stop_file}"
+        )
 
     def _parse_response(self, resp) -> List[Union[Message, None]]:
         """Outputs from the endpoint response"""
