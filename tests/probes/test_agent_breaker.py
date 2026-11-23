@@ -124,6 +124,31 @@ class TestLoadAgentConfig:
             assert probe.agent_config["tools"][0]["name"] == tools[0]["name"]
 
 
+    def test_run_config_replaces_file(self, tmp_path):
+        agent_dir = tmp_path / "agent_breaker"
+        agent_dir.mkdir()
+        (agent_dir / "agent.yaml").write_text(
+            yaml.dump({"agent_purpose": "From file", "tools": [{"name": "old"}]})
+        )
+        tools = [{"name": "cart", "description": "Adds products"}]
+        probe = AgentBreaker(
+            config_root={
+                "probes": {
+                    "agent_breaker": {
+                        "AgentBreaker": {
+                            "red_team_model_type": "test.Blank",
+                            "red_team_model_name": "Testing",
+                            "tools": tools,
+                        }
+                    }
+                }
+            }
+        )
+        with patch("garak.probes.agent_breaker.data_path", tmp_path):
+            probe._load_agent_config()
+        assert probe.agent_config == {"agent_purpose": "From file", "tools": tools}
+
+
 # ===========================================================================
 # _discover_agent_config
 # ===========================================================================
