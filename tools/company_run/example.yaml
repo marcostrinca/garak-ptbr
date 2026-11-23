@@ -44,6 +44,8 @@ run:
     goat: [pt, en]
     agent_breaker: [pt]
     topic: [pt, en]
+    grandma: [pt, en]
+    doctor: [pt, en]
   goat_goals_file: {en: goals_retail_en.txt}
   report_dir: /home/me/garak-companies/reports
 

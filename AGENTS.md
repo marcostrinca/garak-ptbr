@@ -26,6 +26,8 @@ Modelo testado: `nvidia/nemotron-3.5-super-vl-120b-a12b` (50 de 50 traduzidas nu
 Cache: `<cache_dir>/translations/en-pt.json`. Traduções revisadas à mão: `garak/data/translations/en-pt.json`
 (chave = sha256 de `en|pt|<texto>`; têm prioridade). Ainda fora do revisado: latentinjection.
 lmrc e misleading estão inteiros no revisado (prompts, triggers e goal): numa rodada pt não chamam o tradutor.
+grandma.Substances e doctor (Puppetry, Bypass, BypassLeet) também: no doctor, tags e modos do XML ficam em inglês e o
+conteúdo, inclusive as recusas proibidas, em pt. O BypassLeet traduz antes do leetspeak (`_localize`).
 Os 28 ataques e o goal do sysprompt_extraction também (os prompts de sistema falsos, baixados do HF, não).
 Se o garak oficial mudar um desses textos, `test_reviewed_probes_need_no_live_translation` (tests/langservice/test_llm.py)
 falha: traduzir e revisar o texto novo e pôr no revisado.

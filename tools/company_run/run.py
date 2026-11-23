@@ -40,6 +40,8 @@ FAMILIES = {
     "fitd": ("fitd.FITD", ["pt", "en"]),
     "agent_breaker": ("agent_breaker.AgentBreaker", ["pt", "en"]),
     "topic": ("topic.WordnetControversial", ["pt", "en"]),
+    "grandma": ("grandma.Substances", ["pt", "en"]),
+    "doctor": ("doctor.Puppetry,doctor.Bypass,doctor.BypassLeet", ["pt", "en"]),
 }
 
 
