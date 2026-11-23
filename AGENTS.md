@@ -262,5 +262,12 @@ Signed-off-by: Your Name <your.email@example.com>
 - Use British english in strings if you think you can get away with it -- claim ignorance if caught.
 - Avoid overly explanatory comments.
 
-
-
+## Alvo REST e rodada por empresa
+- `rest.RestGenerator`: `session_json_field` + `$SESSION` mantêm a conversa (ramificação refaz os turnos numa sessão
+  nova; rodar com `parallel_attempts` desligado); `response_json_join` junta várias partes da resposta num texto;
+  `preflight_command`/`preflight_expect`/`preflight_every_request` e `stop_patterns`/`stop_file` são as travas para
+  alvo que age em sistema real (`TargetStopped`). A trava vale pelo arquivo: probes que engolem exceção (agent_breaker,
+  IterativeProbe) seguem, mas cada envio confere o `stop_file` antes e não sai.
+- `agent_breaker`: `agent_purpose` e `tools` podem vir na config da rodada (substituem as do `agent_config_file`).
+- `tools/company_run/run.py`: um arquivo por empresa (exemplo em `example.yaml`, README ao lado). Sem flag só mostra o
+  plano; `--rehearsal` usa alvo falso local; `--live` vai ao alvo real. O arquivo real da empresa fica fora do repo.

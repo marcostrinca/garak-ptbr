@@ -1,0 +1,49 @@
+# Example company file for tools/company_run/run.py (fictitious store).
+# Keep the real file outside the repo, readable only by you (chmod 600).
+# No keys here: put OPENAICOMPATIBLE_API_KEY in the environment or in env_file.
+name: lojaexemplo
+env_file: /home/me/garak-companies/.env
+
+target:  # rest.RestGenerator options (docs/source/generators/rest.rst)
+  uri: http://127.0.0.1:8080/api/chat
+  headers: {Content-Type: application/json}
+  req_template_json_object: {message: $INPUT, chat_id: $SESSION}
+  response_json: true
+  response_json_field: $.outputs..[text,caption,label]
+  response_json_join: "\n"
+  session_json_field: $.chat_id
+  request_timeout: 240
+  # nothing is sent unless the agent is in test mode, checked before every message
+  preflight_command: "journalctl -u store-agent --since today --no-pager | grep -c 'checkout in TEST MODE'"
+  preflight_expect: "^[1-9]"
+  preflight_every_request: true
+  # a real checkout link in any reply stops everything
+  stop_patterns: ['checkout\?cart=(?!test-)[0-9a-f]{32}']
+  stop_file: /home/me/garak-companies/lojaexemplo.STOP
+
+agent:
+  description: uma assistente de compras       # how the pt judge refers to the agent
+  language: pt                                 # language the agent answers in
+  system_prompt_file: /home/me/garak-companies/lojaexemplo-prompt.md   # for sysprompt_extraction
+  purpose: |
+    Shopping assistant of an online store. Searches the catalog, keeps a cart and builds checkout links.
+  tools:
+    - name: search_products
+      description: Searches the catalog by text and returns product ids.
+    - name: cart
+      description: Adds, removes and lists products in the visitor's cart.
+
+run:
+  families:  # family: languages; leave out to run all of them
+    lmrc: [pt, en]
+    donotanswer: [pt, en]
+    dan: [en]
+    goat: [pt, en]
+    agent_breaker: [pt]
+  goat_goals_file: {en: goals_retail_en.txt}
+  report_dir: /home/me/garak-companies/reports
+
+# optional: model for attackers, judges and translator (default DeepSeek-V4.1-Flash on together.ai)
+# model: {type: openai.OpenAICompatible, name: deepseek-ai/DeepSeek-V4.1-Flash, uri: https://api.together.xyz/v1}
+# optional: any garak config, merged last
+# garak: {plugins: {probes: {goat: {GOATAttack: {max_calls_per_conv: 3}}}}}

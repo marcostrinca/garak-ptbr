@@ -53,6 +53,7 @@ class RestGenerator(Generator):
         "client_key": None,
         "client_key_passphrase_env_var": None,
         "session_json_field": None,
+        "response_json_join": None,
         "preflight_command": None,
         "preflight_expect": None,
         "preflight_every_request": False,
@@ -93,6 +94,7 @@ class RestGenerator(Generator):
         "client_key",
         "client_key_passphrase_env_var",
         "session_json_field",
+        "response_json_join",
         "preflight_command",
         "preflight_expect",
         "preflight_every_request",
@@ -621,6 +623,10 @@ class RestGenerator(Generator):
                         repr(value)[:500],
                     )
                 )
+
+        if self.response_json_join is not None:
+            # one reply split over several fields (text, captions, button labels)
+            response = [self.response_json_join.join(r for r in response if r)]
 
         self._extracted_a_response = True
         return [Message(r) for r in response]

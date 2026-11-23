@@ -22,6 +22,7 @@ Uses the following options from ``_config.plugins.generators["rest.RestGenerator
 * ``client_cert`` - (optional) Path to a PEM-encoded client certificate file for mTLS. If the file contains both the certificate and private key, ``client_key`` is not required.
 * ``client_key`` - (optional) Path to the client private key file for mTLS. Must be set if ``client_cert`` does not contain the key. Cannot be set without ``client_cert``.
 * ``client_key_passphrase_env_var`` - (optional) Name of an environment variable holding the passphrase for an encrypted ``client_key``. The passphrase is never read from config files. If set, the named env var must be defined or startup will fail.
+* ``response_json_join`` - (optional) When the JSONPath in ``response_json_field`` finds several values (e.g. a reply split into text parts and button labels, ``$.outputs..[text,label]``), join them with this string into one response. Without it, only the first value is used.
 * ``session_json_field`` - (optional) JSONPath to the session or chat id in the endpoint's JSON response. When set, multi-turn conversations stay on one session: the id goes back in the next turn through ``$SESSION`` (see below).
 * ``preflight_command`` - (optional) Command run before the first request (a list is run as is, a string through the shell). Nothing is sent unless it exits 0 and, if set, its output matches ``preflight_expect``.
 * ``preflight_expect`` - (optional) Regex the preflight output must match.
