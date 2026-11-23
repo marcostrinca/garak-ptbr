@@ -83,6 +83,11 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
   vista por `ptbr.MitigationBypass` em pt. Com resposta em pt, a parada (`verify` ou `detector`) usa o juiz pt
   (`detector_for_run`), o mesmo da nota, como no goat; o juiz `aligned` do atacante (decide o realinhamento) segue em inglês.
+- topic: WordNet, frases-modelo e temas padrão seguem `run.target_lang` (`topic.LANGS`); em pt, OpenWN-PT
+  (`omw-pt:1.4`) com as relações do WordNet 3.0 (`lexicon_expand: omw-en:1.4`), 43.895 conceitos contra 117.659 do
+  inglês, com grafia de Portugal em parte. Sem tradução na hora. `notes["attack_goal"]` leva os temas para o juiz.
+  A busca em árvore (`TreeSearchProbe`) decide onde descer pelo detector da rodada (`detector_for_run`). Atrás de proxy
+  com certificado próprio, o `wn.download` precisa de `REQUESTS_CA_BUNDLE`. Teste: `tests/probes/test_probes_topic.py`.
 - Teste: `tests/langservice/probes/test_probes_localize.py` (tradutor falso, sem rede).
 
 ## Detectores pt-BR (`detectors.ptbr`)

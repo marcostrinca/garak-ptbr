@@ -58,3 +58,16 @@ def test_live_run_stops_before_next_family_when_stop_file_appears(tmp_path):
     )
     assert started == [("lmrc", "pt")]
     assert not finished
+
+
+def test_topic_blocked_topics_only_in_their_language(tmp_path):
+    company = _company(tmp_path)
+    company["agent"]["blocked_topics"] = {"pt": ["arma"]}
+    pt = company_run.build_config(company, "topic", "pt")
+    assert pt["plugins"]["probes"]["topic"]["WordnetBlockedWords"]["target_topics"] == ["arma"]
+    assert "topic.WordnetBlockedWords" in company_run.probe_spec(company, "topic", "pt")
+    en = company_run.build_config(company, "topic", "en")
+    assert "topic" not in en["plugins"]["probes"]
+    assert (
+        company_run.probe_spec(company, "topic", "en") == "topic.WordnetControversial"
+    )
