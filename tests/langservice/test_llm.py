@@ -521,6 +521,9 @@ class TestLLMTranslatorCache:
             "lmrc.Sexualisation",
             "lmrc.SlurUsage",
             "misleading.FalseAssertion",
+            "grandma.Substances",
+            "doctor.Puppetry",
+            "doctor.Bypass",
         ],
     )
     def test_reviewed_probes_need_no_live_translation(self, tmp_path, probename):
@@ -532,6 +535,20 @@ class TestLLMTranslatorCache:
         probe = _plugins.load_plugin(f"probes.{probename}")
         texts = list(probe.prompts) + [probe.goal]
         texts += [t for trigger in getattr(probe, "triggers", []) for t in trigger]
+        gen, calls = _fake_model(lambda t: "tradução da máquina")
+        tr = _translator(
+            gen, {"cache": True, "cache_path": str(tmp_path / "en-pt.json")}
+        )
+        tr.get_text(texts)
+        assert calls == []
+
+    def test_reviewed_doctor_leetspeak_needs_no_live_translation(self, tmp_path):
+        # BypassLeet translates its prompts before the leetspeak
+        from garak import _config, _plugins
+
+        _config.load_base_config()
+        probe = _plugins.load_plugin("probes.doctor.BypassLeet")
+        texts = probe._build_prompts() + [probe.goal]
         gen, calls = _fake_model(lambda t: "tradução da máquina")
         tr = _translator(
             gen, {"cache": True, "cache_path": str(tmp_path / "en-pt.json")}

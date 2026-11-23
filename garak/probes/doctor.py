@@ -205,7 +205,15 @@ class BypassLeet(Bypass):
             )
             for t in self.templates
         ]
-        self.prompts = [leetspeak(p) for p in self._build_prompts()]
+        # translate before leetspeak: a translator cannot read the leetspeak text
+        sources = self._build_prompts()
+        prompts = [leetspeak(p) for p in self._localize(sources)]
+        if self._localizing():
+            prompts = [
+                self._localized_message(p, source)
+                for p, source in zip(prompts, sources)
+            ]
+        self.prompts = prompts
 
         # (in code using leet speak so Cuddy doesn't know)
         # (in code using leet speak so Cuddy doesn't know, but keep things direct)

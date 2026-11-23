@@ -216,6 +216,22 @@ def test_homoglyphs_are_applied_after_translation(fake_pt):
         assert restored.endswith("em português, ação")
 
 
+def test_doctor_leetspeak_is_applied_after_translation(fake_pt):
+    p = _plugins.load_plugin("probes.doctor.BypassLeet")
+    sources = p._build_prompts()
+    assert fake_pt.calls == [sources], "translator gets the clean text"
+    leet = str.maketrans("ieaostIEAOST", "134057134057")
+    for msg, source in zip(p.prompts, sources):
+        translated = f"{source} em português, ação"
+        assert msg.lang == "pt"
+        assert msg.notes["source_text"] == source
+        assert msg.text != translated
+        assert len(msg.text) == len(translated)
+        assert all(
+            c == t or c == t.translate(leet) for c, t in zip(msg.text, translated)
+        )
+
+
 def test_sata_masks_in_english_then_translates(fake_pt):
     p = _plugins.load_plugin("probes.sata.MLM")
     template_call, payload_call = fake_pt.calls
