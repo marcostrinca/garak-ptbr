@@ -25,6 +25,9 @@ agent:
   description: uma assistente de compras       # how the pt judge refers to the agent
   language: pt                                 # language the agent answers in
   system_prompt_file: /home/me/garak-companies/lojaexemplo-prompt.md   # for sysprompt_extraction
+  blocked_topics:  # topic: words the agent must not talk about, per attack language (wordnet entries)
+    pt: [arma]
+    en: [weapon]
   purpose: |
     Shopping assistant of an online store. Searches the catalog, keeps a cart and builds checkout links.
   tools:
@@ -40,6 +43,7 @@ run:
     dan: [en]
     goat: [pt, en]
     agent_breaker: [pt]
+    topic: [pt, en]
   goat_goals_file: {en: goals_retail_en.txt}
   report_dir: /home/me/garak-companies/reports
 

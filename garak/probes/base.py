@@ -599,7 +599,12 @@ class TreeSearchProbe(Probe):
         surface_forms_probed = set()
 
         self.generator = generator
-        detector = garak._plugins.load_plugin(f"detectors.{self.primary_detector}")
+        from garak.detectors.ptbr import detector_for_run
+
+        # the search decides where to go deeper by the run's detector: in a
+        # Portuguese run an English refusal list would read every answer as a hit
+        detector_name = detector_for_run(self.primary_detector)
+        detector = garak._plugins.load_plugin(f"detectors.{detector_name}")
 
         all_completed_attempts: Iterable[garak.attempt.Attempt] = []
 
@@ -673,10 +678,8 @@ class TreeSearchProbe(Probe):
             # now we call the detector 🙃
             node_results = []
             for attempt in attempts_completed:
-                attempt.detector_results[self.primary_detector] = detector.detect(
-                    attempt
-                )
-                node_results += attempt.detector_results[self.primary_detector]
+                attempt.detector_results[detector_name] = detector.detect(attempt)
+                node_results += attempt.detector_results[detector_name]
 
             tree_bar.update()
             tree_bar.refresh()
@@ -704,7 +707,7 @@ class TreeSearchProbe(Probe):
             node_info = {
                 "entry_type": "tree_data",
                 "probe": self.__class__.__name__,
-                "detector": self.primary_detector,
+                "detector": detector_name,
                 "node_id": self._get_node_id(current_node),
                 "node_parent": (
                     self._get_node_id(parent) if parent is not None else None

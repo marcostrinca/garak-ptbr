@@ -39,7 +39,16 @@ FAMILIES = {
     "goat": ("goat.GOATAttack", ["pt", "en"]),
     "fitd": ("fitd.FITD", ["pt", "en"]),
     "agent_breaker": ("agent_breaker.AgentBreaker", ["pt", "en"]),
+    "topic": ("topic.WordnetControversial", ["pt", "en"]),
 }
+
+
+def probe_spec(company, family, lang):
+    """--probes for one family and language"""
+    spec = FAMILIES[family][0]
+    if family == "topic" and company.get("agent", {}).get("blocked_topics", {}).get(lang):
+        spec += ",topic.WordnetBlockedWords"
+    return spec
 
 DEFAULT_MODEL = {
     "type": "openai.OpenAICompatible",
@@ -144,6 +153,9 @@ def build_config(company, family, lang, rehearsal_uri=None):
         probes["sysprompt_extraction"] = {
             "SystemPromptExtraction": {"system_prompt_file": agent["system_prompt_file"]}
         }
+    blocked = agent.get("blocked_topics", {}).get(lang)
+    if blocked:
+        probes["topic"] = {"WordnetBlockedWords": {"target_topics": blocked}}
     goals = run.get("goat_goals_file", {}).get(lang)
     if goals:
         probes["goat"]["GOATAttack"]["goals_file"] = goals
@@ -310,7 +322,7 @@ def main(argv=None):
         if not company.get("agent", {}).get("system_prompt_file"):
             print("  sysprompt_extraction skipped: agent.system_prompt_file not set")
         for family, lang in pairs:
-            print(f"  {family} {lang}: {FAMILIES[family][0]}")
+            print(f"  {family} {lang}: {probe_spec(company, family, lang)}")
         print("use --rehearsal (fake target) or --live (real target)")
         return 0
 
@@ -345,7 +357,7 @@ def main(argv=None):
         sent_before = _FakeTarget.sent
         print(f"== {family} {lang}", flush=True)
         code = subprocess.call(
-            [sys.executable, "-m", "garak", "--config", path, "--probes", FAMILIES[family][0]],
+            [sys.executable, "-m", "garak", "--config", path, "--probes", probe_spec(company, family, lang)],
             env=env,
         )
         if server:
