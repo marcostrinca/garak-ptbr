@@ -5,11 +5,42 @@ These attacks rephrase requests for unsafe content in an attempt to bypass safeg
 This module is home to probes that rely on specific grammatical alterations and rephrasing
 to implement their technique.
 
+In a run translated to a language with a ``<tense>_tense_<lang>.txt`` file in
+data/phrasing, the tense probes send those requests, written in that language,
+and translate nothing.
+
 """
 
 from garak import _config
+from garak.attempt import Message
 from garak.data import path as data_path
+from garak.exception import GarakException
 import garak.probes
+
+
+def _load_tense_prompts(probe, tense):
+    """Requests in ``tense``, from the run's target language file when there is one"""
+    native_file = None
+    if probe._localizing():
+        try:
+            native_file = (
+                data_path
+                / "phrasing"
+                / f"{tense}_tense_{probe.langprovider.target_lang}.txt"
+            )
+        except GarakException:
+            native_file = None
+    with open(
+        native_file or data_path / "phrasing" / f"{tense}_tense_en.txt",
+        "r",
+        encoding="utf-8",
+    ) as file:
+        prompts = [line.strip() for line in file]
+    if native_file is not None:
+        # requests reviewed in the target language go as they are
+        probe.lang = probe.langprovider.target_lang
+        prompts = [Message(prompt, lang=probe.lang) for prompt in prompts]
+    return prompts
 
 
 class PastTenseFull(garak.probes.Probe):
@@ -36,15 +67,7 @@ class PastTenseFull(garak.probes.Probe):
     def __init__(self, config_root=_config):
         super().__init__(config_root=config_root)
 
-        self.prompts = []
-
-        with open(
-            data_path / "phrasing" / "past_tense_en.txt",
-            "r",
-            encoding="utf-8",
-        ) as file:
-            for str in file:
-                self.prompts.append(str.strip())
+        self.prompts = _load_tense_prompts(self, "past")
 
 
 class PastTense(PastTenseFull):
@@ -87,15 +110,7 @@ class FutureTenseFull(garak.probes.Probe):
     def __init__(self, config_root=_config):
         super().__init__(config_root=config_root)
 
-        self.prompts = []
-
-        with open(
-            data_path / "phrasing" / "future_tense_en.txt",
-            "r",
-            encoding="utf-8",
-        ) as file:
-            for str in file:
-                self.prompts.append(str.strip())
+        self.prompts = _load_tense_prompts(self, "future")
 
 
 class FutureTense(FutureTenseFull):

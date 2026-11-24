@@ -18,6 +18,7 @@ import garak.probes.dra
 import garak.probes.fitd
 import garak.probes.encoding
 import garak.probes.goat
+import garak.probes.phrasing
 import garak.resources.encodings
 from garak import _config, _plugins
 from garak.attempt import Conversation, Message, Turn
@@ -527,6 +528,25 @@ def test_donotanswer_sends_reviewed_portuguese(fake_pt):
         assert attempt.prompt.last_message().text == entry["prompt"]
         assert attempt.lang == "pt"
         assert attempt.intent == entry["intents"][0]
+
+
+@pytest.mark.parametrize(
+    "classname,tense", [("PastTenseFull", "past"), ("FutureTenseFull", "future")]
+)
+def test_phrasing_sends_reviewed_portuguese(fake_pt, classname, tense):
+    p = _plugins.load_plugin(f"probes.phrasing.{classname}")
+    assert p.lang == "pt"
+    with open(
+        garak.probes.phrasing.data_path / "phrasing" / f"{tense}_tense_pt.txt",
+        encoding="utf-8",
+    ) as f:
+        reviewed = [line.strip() for line in f]
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+
+    assert fake_pt.calls == []
+    assert [a.prompt.last_message().text for a in attempts] == reviewed
+    assert all(a.lang == "pt" for a in attempts)
 
 
 def test_fitd_runs_in_portuguese(fake_pt, mocker):
