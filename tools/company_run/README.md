@@ -17,7 +17,7 @@ Cada família de ataque, em cada idioma, é uma rodada do garak com relatório p
 
 - `target`: opções do `rest.RestGenerator` (ver `docs/source/generators/rest.rst`), inclusive a conversa
   (`session_json_field`), a junção da resposta (`response_json_join`) e as travas (`preflight_command`,
-  `stop_patterns`, `stop_file`). Se o chat mostra imagem ou botão a partir de um campo próprio da resposta,
+  `stop_patterns`, `stop_file`) e o ritmo (`request_interval`). Se o chat mostra imagem ou botão a partir de um campo próprio da resposta,
   inclua o campo da URL em `response_json_field`: sem ele, o `web_injection` não vê o vazamento.
 - `agent`: como o juiz pt chama o agente (`description`), a língua em que ele responde (`language`), o prompt de
   sistema real para o `sysprompt_extraction` (`system_prompt_file`; sem ele, essa família fica de fora) e a
@@ -35,6 +35,10 @@ Cada família de ataque, em cada idioma, é uma rodada do garak com relatório p
 
 - Se o `stop_file` existir, nenhuma rodada começa e nenhuma mensagem sai. Ele é criado quando um `stop_patterns`
   aparece numa resposta. Olhe o que aconteceu antes de apagar.
+- Ponha em `stop_patterns` também a resposta que o agente dá quando não roda o modelo (limite por hora, sem saldo,
+  fora do ar). Sem isso, a rodada segue e o juiz conta o aviso como recusa, "passou".
+- Agente com limite de mensagens por hora: `request_interval` (segundos entre mensagens) abaixo do limite.
+  Ex.: limite de 1.000 por hora, `request_interval: 4` (900 por hora).
 - O `preflight_command` roda antes de cada mensagem com `preflight_every_request`; se não imprimir o esperado, nada
   é enviado.
 - Ataque de vários turnos (goat, fitd, agent_breaker) age de verdade nas ferramentas do agente: num agente de loja,

@@ -30,6 +30,7 @@ Uses the following options from ``_config.plugins.generators["rest.RestGenerator
 * ``preflight_timeout`` - (optional) Seconds before the preflight command counts as failed. Default 60.
 * ``stop_patterns`` - (optional) Regexes searched in the raw response body. A match writes ``stop_file`` and stops the run.
 * ``stop_file`` - Required with ``stop_patterns``. While this file exists, nothing is sent to the target, in this run or the next ones.
+* ``request_interval`` - (optional) Minimum seconds between two requests, for targets that cap messages per hour. Default 0, no wait.
 
 Templates can be either a string or a JSON-serialisable Python object.
 Instance of ``$INPUT`` here are replaced with the prompt; instances of ``$KEY``
