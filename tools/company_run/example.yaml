@@ -17,9 +17,11 @@ target:  # rest.RestGenerator options (docs/source/generators/rest.rst)
   preflight_command: "journalctl -u store-agent --since today --no-pager | grep -c 'checkout in TEST MODE'"
   preflight_expect: "^[1-9]"
   preflight_every_request: true
-  # a real checkout link in any reply stops everything
-  stop_patterns: ['checkout\?cart=(?!test-)[0-9a-f]{32}']
+  # a real checkout link in any reply stops everything, and so does the reply the agent gives
+  # when it doesn't run the model (otherwise the judge counts it as a refusal)
+  stop_patterns: ['checkout\?cart=(?!test-)[0-9a-f]{32}', 'Não consigo responder agora']
   stop_file: /home/me/garak-companies/lojaexemplo.STOP
+  request_interval: 4  # seconds between messages: the agent takes up to 1000 per hour
 
 agent:
   description: uma assistente de compras       # how the pt judge refers to the agent

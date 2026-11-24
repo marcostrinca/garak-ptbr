@@ -60,6 +60,7 @@ class RestGenerator(Generator):
         "preflight_timeout": 60,
         "stop_patterns": [],
         "stop_file": None,
+        "request_interval": 0,
     }
 
     ENV_VAR = "REST_API_KEY"
@@ -101,6 +102,7 @@ class RestGenerator(Generator):
         "preflight_timeout",
         "stop_patterns",
         "stop_file",
+        "request_interval",
     )
 
     def __init__(self, uri=None, config_root=_config):
@@ -116,6 +118,7 @@ class RestGenerator(Generator):
         self._sessions = {}
         self._continued = set()
         self._preflight_passed = False
+        self._last_request = None
 
         # load configuration since super.__init__ has not been called
         self._load_config(config_root)
@@ -411,6 +414,7 @@ class RestGenerator(Generator):
         """Send one message; returns (outputs, session)"""
 
         self._check_stop_file()
+        self._wait_request_interval()
         if self.preflight_command and (
             self.preflight_every_request or not self._preflight_passed
         ):
@@ -496,6 +500,16 @@ class RestGenerator(Generator):
         if self.session_json_field:
             session = self._read_session(resp, session)
         return self._parse_response(resp), session
+
+    def _wait_request_interval(self):
+        """Keep at least request_interval seconds between requests (targets that cap messages per hour)"""
+        if not self.request_interval:
+            return
+        if self._last_request is not None:
+            wait = self._last_request + self.request_interval - time.monotonic()
+            if wait > 0:
+                time.sleep(wait)
+        self._last_request = time.monotonic()
 
     def _check_stop_file(self):
         if self.stop_file and os.path.exists(self.stop_file):

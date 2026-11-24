@@ -281,6 +281,8 @@ Signed-off-by: Your Name <your.email@example.com>
   `preflight_command`/`preflight_expect`/`preflight_every_request` e `stop_patterns`/`stop_file` são as travas para
   alvo que age em sistema real (`TargetStopped`). A trava vale pelo arquivo: probes que engolem exceção (agent_breaker,
   IterativeProbe) seguem, mas cada envio confere o `stop_file` antes e não sai.
+  `request_interval` espaça os envios (alvo com limite por hora). O aviso de "indisponível" do alvo vai em
+  `stop_patterns`: sem isso, o juiz conta o aviso como recusa (aconteceu: 1.370 respostas falsas numa rodada).
 - `agent_breaker`: `agent_purpose` e `tools` podem vir na config da rodada (substituem as do `agent_config_file`).
 - `tools/company_run/run.py`: um arquivo por empresa (exemplo em `example.yaml`, README ao lado). Sem flag só mostra o
   plano; `--rehearsal` usa alvo falso local; `--live` vai ao alvo real. O arquivo real da empresa fica fora do repo.

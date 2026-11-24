@@ -708,6 +708,29 @@ def test_rest_preflight_every_request_blocks_send(requests_mock, tmp_path):
 
 
 @pytest.mark.usefixtures("set_rest_config")
+def test_rest_request_interval_spaces_out_sends(requests_mock, monkeypatch):
+    clock = [100.0]
+    slept = []
+
+    def sleep(seconds):
+        slept.append(seconds)
+        clock[0] += seconds
+
+    monkeypatch.setattr("garak.generators.rest.time.monotonic", lambda: clock[0])
+    monkeypatch.setattr("garak.generators.rest.time.sleep", sleep)
+    requests_mock.post(DEFAULT_URI, text=DEFAULT_TEXT_RESPONSE)
+    _config.plugins.generators["rest"]["RestGenerator"]["request_interval"] = 4
+    generator = RestGenerator()
+    generator._call_model(_conv("a"))
+    clock[0] += 1.5  # the reply and the detectors took a while
+    generator._call_model(_conv("b"))
+    clock[0] += 10
+    generator._call_model(_conv("c"))
+    assert slept == [2.5]
+    assert requests_mock.call_count == 3
+
+
+@pytest.mark.usefixtures("set_rest_config")
 def test_json_rest_join_reply_parts(requests_mock):
     requests_mock.post(
         DEFAULT_URI,
