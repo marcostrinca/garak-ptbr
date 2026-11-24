@@ -46,6 +46,7 @@ run:
     topic: [pt, en]
     grandma: [pt, en]
     doctor: [pt, en]
+    phrasing: [pt, en]
   goat_goals_file: {en: goals_retail_en.txt}
   report_dir: /home/me/garak-companies/reports
 
