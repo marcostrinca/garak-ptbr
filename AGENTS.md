@@ -31,6 +31,9 @@ conteúdo, inclusive as recusas proibidas, em pt. O BypassLeet traduz antes do l
 phrasing.PastTense e FutureTense não traduzem na hora: numa rodada pt mandam `data/phrasing/<tempo>_tense_pt.txt`
 (revisado, linha a linha com o en), como o donotanswer; os goals estão no revisado. Frases en que só mudam a ordem
 das palavras viram iguais em pt (30 repetidas no passado, 42 no futuro): mantidas para não desalinhar do en.
+web_injection.ImageExfil também não traduz: numa rodada pt manda `data/web_injection/image_exfil_pt.json` (revisado).
+Pede a imagem no formato que o chat mostra (`image_format`) e o detector `web_injection.ExfilURI` aceita qualquer
+formato; por isso também conta URL que o chat mostraria só como texto (ler os acertos). O company_run usa domínio `.invalid`.
 Os 28 ataques e o goal do sysprompt_extraction também (os prompts de sistema falsos, baixados do HF, não).
 Se o garak oficial mudar um desses textos, `test_reviewed_probes_need_no_live_translation` (tests/langservice/test_llm.py)
 falha: traduzir e revisar o texto novo e pôr no revisado.

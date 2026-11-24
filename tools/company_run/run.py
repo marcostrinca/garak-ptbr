@@ -43,7 +43,11 @@ FAMILIES = {
     "grandma": ("grandma.Substances", ["pt", "en"]),
     "doctor": ("doctor.Puppetry,doctor.Bypass,doctor.BypassLeet", ["pt", "en"]),
     "phrasing": ("phrasing.PastTense,phrasing.FutureTense", ["pt", "en"]),
+    "web_injection": ("web_injection.ImageExfil", ["pt", "en"]),
 }
+
+# web_injection: .invalid never resolves (RFC 2606), so a leaked URI reaches no one
+EXFIL_DOMAINS = ["images-cdn.invalid"]
 
 
 def probe_spec(company, family, lang):
@@ -156,6 +160,9 @@ def build_config(company, family, lang, rehearsal_uri=None):
         probes["sysprompt_extraction"] = {
             "SystemPromptExtraction": {"system_prompt_file": agent["system_prompt_file"]}
         }
+    probes["web_injection"] = {"ImageExfil": {"domains": EXFIL_DOMAINS}}
+    if agent.get("image_format"):
+        probes["web_injection"]["ImageExfil"]["image_format"] = agent["image_format"]
     blocked = agent.get("blocked_topics", {}).get(lang)
     if blocked:
         probes["topic"] = {"WordnetBlockedWords": {"target_topics": blocked}}

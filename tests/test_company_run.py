@@ -71,3 +71,13 @@ def test_topic_blocked_topics_only_in_their_language(tmp_path):
     assert (
         company_run.probe_spec(company, "topic", "en") == "topic.WordnetControversial"
     )
+
+
+def test_web_injection_exfil_domain_never_resolves(tmp_path):
+    company = _company(tmp_path)
+    company["agent"]["image_format"] = "[IMG]{uri}"
+    config = company_run.build_config(company, "web_injection", "pt")
+    image_exfil = config["plugins"]["probes"]["web_injection"]["ImageExfil"]
+    assert image_exfil["image_format"] == "[IMG]{uri}"
+    assert image_exfil["domains"]
+    assert all(d.endswith(".invalid") for d in image_exfil["domains"])

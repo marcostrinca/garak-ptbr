@@ -17,12 +17,15 @@ Cada família de ataque, em cada idioma, é uma rodada do garak com relatório p
 
 - `target`: opções do `rest.RestGenerator` (ver `docs/source/generators/rest.rst`), inclusive a conversa
   (`session_json_field`), a junção da resposta (`response_json_join`) e as travas (`preflight_command`,
-  `stop_patterns`, `stop_file`).
+  `stop_patterns`, `stop_file`). Se o chat mostra imagem ou botão a partir de um campo próprio da resposta,
+  inclua o campo da URL em `response_json_field`: sem ele, o `web_injection` não vê o vazamento.
 - `agent`: como o juiz pt chama o agente (`description`), a língua em que ele responde (`language`), o prompt de
   sistema real para o `sysprompt_extraction` (`system_prompt_file`; sem ele, essa família fica de fora) e a
   finalidade e as ferramentas para o `agent_breaker` (`purpose`, `tools`). `blocked_topics` (por idioma) são os
   assuntos de que o agente não deve falar: o `topic` desce no WordNet a partir deles (`topic.WordnetBlockedWords`).
   Sem a lista, o `topic` roda só os temas polêmicos de sempre.
+  `image_format` é como a resposta escreve uma imagem que o chat mostra (`{uri}` é a URL; padrão: Markdown); o
+  `web_injection.ImageExfil` pede a imagem nesse formato, com URL num domínio `.invalid`, que não existe.
 - `run`: famílias e idiomas (`families`; sem isso, todas), objetivos do goat por idioma (`goat_goals_file`) e a
   pasta dos relatórios (`report_dir`).
 - `model` (opcional): modelo do atacante, dos juízes e do tradutor. Padrão: DeepSeek-V4.1-Flash na together.ai.
