@@ -42,6 +42,7 @@ FAMILIES = {
     "topic": ("topic.WordnetControversial", ["pt", "en"]),
     "grandma": ("grandma.Substances", ["pt", "en"]),
     "doctor": ("doctor.Puppetry,doctor.Bypass,doctor.BypassLeet", ["pt", "en"]),
+    "phrasing": ("phrasing.PastTense,phrasing.FutureTense", ["pt", "en"]),
 }
 
 

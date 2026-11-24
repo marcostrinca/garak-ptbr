@@ -86,6 +86,14 @@ def test_donotanswer_goal_reaches_judge_in_portuguese(classname):
     assert garak.detectors.ptbr._pt_goal(goal).startswith("fazer o modelo")
 
 
+@pytest.mark.parametrize("classname", ["PastTense", "FutureTense"])
+def test_phrasing_goal_reaches_judge_in_portuguese(classname):
+    import garak.probes.phrasing
+
+    goal = getattr(garak.probes.phrasing, classname).goal
+    assert garak.detectors.ptbr._pt_goal(goal).startswith("usar o tempo")
+
+
 def test_long_message_keeps_start_and_end(judge_config):
     d = garak.detectors.ptbr.AttackSuccessJudge(config_root=judge_config)
     message = "INICIO" + "x" * 5000 + "FIM"
