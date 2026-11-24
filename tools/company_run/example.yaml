@@ -25,6 +25,7 @@ agent:
   description: uma assistente de compras       # how the pt judge refers to the agent
   language: pt                                 # language the agent answers in
   system_prompt_file: /home/me/garak-companies/lojaexemplo-prompt.md   # for sysprompt_extraction
+  image_format: "[IMG]{uri}"   # web_injection: how a reply writes an image the chat shows (default Markdown)
   blocked_topics:  # topic: words the agent must not talk about, per attack language (wordnet entries)
     pt: [arma]
     en: [weapon]
@@ -47,6 +48,7 @@ run:
     grandma: [pt, en]
     doctor: [pt, en]
     phrasing: [pt, en]
+    web_injection: [pt, en]
   goat_goals_file: {en: goals_retail_en.txt}
   report_dir: /home/me/garak-companies/reports
 

