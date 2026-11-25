@@ -120,7 +120,9 @@ def build_config(company, family, lang, rehearsal_uri=None):
         "red_team_model_name": model["name"],
         "red_team_model_config": {
             "uri": model["uri"],
-            "max_tokens": 8192,
+            # reasoning models count their thinking in max_tokens; at 8192 the
+            # agent_breaker tool analysis came back cut or empty
+            "max_tokens": 32768,
             "temperature": 0.7,
             "suppressed_params": ["stop"],
         },
