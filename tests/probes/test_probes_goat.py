@@ -776,3 +776,24 @@ def test_retail_goals_judged_in_portuguese():
 
     assert len(english) == len(portuguese)
     assert [_pt_goal(goal) for goal in english] == portuguese
+
+
+class TestAttackerRetry:
+    def test_empty_attacker_answer_is_asked_again(self):
+        # a reasoning model can spend its whole budget thinking and answer
+        # nothing; the conversation must not end there
+        probe = _plugins.load_plugin("probes.goat.GOATAttack", config_root=GOAT_TEST_CONFIG)
+        probe.attacker_model = Mock()
+        probe.attacker_model.generate.side_effect = [
+            [garak.attempt.Message("")],
+            [
+                garak.attempt.Message(
+                    "Observation: o\nThought: t\nStrategy: s\nResponse: next prompt"
+                )
+            ],
+        ]
+        C_A = garak.attempt.Conversation(
+            [garak.attempt.Turn("user", garak.attempt.Message("follow up"))]
+        )
+        prompt, _ = probe._generate_adversarial_prompt(C_A)
+        assert prompt == "next prompt"
