@@ -43,3 +43,9 @@ Cada família de ataque, em cada idioma, é uma rodada do garak com relatório p
   é enviado.
 - Ataque de vários turnos (goat, fitd, agent_breaker) age de verdade nas ferramentas do agente: num agente de loja,
   pôr na sacola grava dado. Rode contra um ambiente de teste.
+
+## Rodada sem medida
+
+Rodada que termina sem nenhuma nota sai como `NOT MEASURED` (e `--live` sai com código 3). Ela não diz nada sobre o
+agente, nem que ele resistiu. Acontece, por exemplo, com o fitd contra um agente que recusa até o primeiro passo
+inofensivo, ou quando o atacante não gera ataque. Leia o log do garak antes de repetir.

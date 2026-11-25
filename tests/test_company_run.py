@@ -81,3 +81,26 @@ def test_web_injection_exfil_domain_never_resolves(tmp_path):
     assert image_exfil["image_format"] == "[IMG]{uri}"
     assert image_exfil["domains"]
     assert all(d.endswith(".invalid") for d in image_exfil["domains"])
+
+
+def test_run_with_nothing_scored_counts_as_not_measured(tmp_path):
+    # FITD against an agent that refuses everything, and agent_breaker with no
+    # attempts, finish with exit 0 but measure nothing
+    import json
+
+    skipped = tmp_path / "fitd.report.jsonl"
+    skipped.write_text(
+        json.dumps({"entry_type": "attempt", "status": 2})
+        + "\n"
+        + json.dumps({"entry_type": "eval", "total_evaluated": 0})
+        + "\n"
+    )
+    no_attempts = tmp_path / "agent_breaker.report.jsonl"
+    no_attempts.write_text(json.dumps({"entry_type": "init"}) + "\n")
+    measured = tmp_path / "goat.report.jsonl"
+    measured.write_text(json.dumps({"entry_type": "eval", "total_evaluated": 10}) + "\n")
+
+    assert company_run.scored(str(skipped)) == 0
+    assert company_run.scored(str(no_attempts)) == 0
+    assert company_run.scored(str(tmp_path / "missing.jsonl")) == 0
+    assert company_run.scored(str(measured)) == 10
