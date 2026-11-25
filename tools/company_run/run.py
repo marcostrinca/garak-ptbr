@@ -120,7 +120,9 @@ def build_config(company, family, lang, rehearsal_uri=None):
         "red_team_model_name": model["name"],
         "red_team_model_config": {
             "uri": model["uri"],
-            "max_tokens": 8192,
+            # reasoning models count their thinking in max_tokens; at 8192 the
+            # agent_breaker tool analysis came back cut or empty
+            "max_tokens": 32768,
             "temperature": 0.7,
             "suppressed_params": ["stop"],
         },
@@ -285,6 +287,19 @@ def summary(report_path):
     return [f"  attempts {attempts}"] + lines
 
 
+def scored(report_path):
+    """How many results the detectors scored; 0 means the run measured nothing"""
+    if not os.path.exists(report_path):
+        return 0
+    total = 0
+    with open(report_path, encoding="utf-8") as f:
+        for line in f:
+            entry = json.loads(line)
+            if entry.get("entry_type") == "eval":
+                total += entry.get("total_evaluated") or 0
+    return total
+
+
 class _FakeTarget(BaseHTTPRequestHandler):
     sent = 0
 
@@ -375,17 +390,22 @@ def main(argv=None):
         report = report_path(company, config)
         if os.path.exists(report):
             print("\n".join(summary(report)))
-        return code
+        measured = scored(report) > 0
+        if not measured:
+            print("  NOT MEASURED: no result was scored, this run says nothing about the target")
+        return code, measured
 
     done, finished = run_all(company, pairs, run_one)
     if server:
         server.shutdown()
     print(f"\n{company['name']}: {len(done)} of {len(pairs)} runs")
-    for family, lang, code in done:
-        print(f"{family} {lang}: exit {code}")
+    for family, lang, (code, measured) in done:
+        print(f"{family} {lang}: exit {code}" + ("" if measured else ", NOT MEASURED"))
     if not finished:
         print(f"STOPPED: {stop_file(company)} exists; look at it before removing it")
         return 1
+    if args.live and not all(measured for _, _, (_, measured) in done):
+        return 3
     return 0
 
 

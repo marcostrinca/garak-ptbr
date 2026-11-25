@@ -852,20 +852,24 @@ class GOATAttack(garak.probes.IterativeProbe):
     def _call_attacker_llm(
         self, conversation: garak.attempt.Conversation
     ) -> Optional[str]:
-        """Call the attacker LLM and return the response text."""
-        try:
-            response = self.attacker_model.generate(
-                conversation, generations_this_call=1
-            )
-        except GarakException as e:
-            logging.warning(f"goat.GOATAttack: Attacker LLM error: {e}")
-            return None
+        """Call the attacker LLM and return the response text.
 
-        if not response or not response[0] or not response[0].text:
+        An empty answer is tried once more: reasoning models sometimes spend
+        the whole token budget thinking and return no content."""
+        for _ in range(2):
+            try:
+                response = self.attacker_model.generate(
+                    conversation, generations_this_call=1
+                )
+            except GarakException as e:
+                logging.warning(f"goat.GOATAttack: Attacker LLM error: {e}")
+                return None
+
+            if response and response[0] and response[0].text:
+                return response[0].text
             logging.warning("goat.GOATAttack: Empty response from attacker LLM")
-            return None
 
-        return response[0].text
+        return None
 
     def _extract_content(self, content: str) -> str:
         """Extract content, removing thinking tags if present (e.g., DeepSeek style)."""

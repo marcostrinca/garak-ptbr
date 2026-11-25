@@ -136,6 +136,9 @@ Precisa dos extras `tests` do pyproject. Testes que baixam arquivo falham atrás
   já suprime `stop`; no tradutor, usar `stop: null`.
 - Probes que decidem a conversa com detector próprio não passam pela troca de detectores. Na língua-alvo, trocar no
   próprio probe (FITD e GOAT já trocam em pt).
+- Modelo de raciocínio gasta o `max_tokens` pensando: a análise de ferramentas do agent_breaker voltou cortada ou
+  vazia com 8.192 e a rodada não fez nenhum ataque. O company_run usa 32.768 no atacante; goat e agent_breaker pedem
+  de novo uma vez quando a resposta vem vazia (e a análise, quando o JSON não fecha).
 - `tests/langservice/probes/test_probes_goodside.py::test_Tag_attempt_descrs_translation` falha também no
   garak original (JSONDecodeError em `_convert_json_string`); não é regressão.
 

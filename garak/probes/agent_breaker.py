@@ -483,7 +483,10 @@ class AgentBreaker(garak.probes.IterativeProbe):
         )
 
     def _get_model_response(self, prompt: str, model=None) -> Optional[str]:
-        """Get a response from a model. Defaults to the red team model."""
+        """Get a response from a model. Defaults to the red team model.
+
+        An empty answer is tried once more: reasoning models sometimes spend
+        the whole token budget thinking and return no content."""
         if model is None:
             model = self.red_team_model
         conv = garak.attempt.Conversation(
@@ -494,21 +497,18 @@ class AgentBreaker(garak.probes.IterativeProbe):
                 ),
             ]
         )
-        try:
-            response = model.generate(prompt=conv, generations_this_call=1)
-        except Exception:
-            msg = f"{model.name} generator raised an error"
-            logging.exception(msg)
-            return None
+        for _ in range(2):
+            try:
+                response = model.generate(prompt=conv, generations_this_call=1)
+            except Exception:
+                msg = f"{model.name} generator raised an error"
+                logging.exception(msg)
+                return None
 
-        if (
-            response is None
-            or len(response) == 0
-            or response[0] is None
-            or response[0].text is None
-        ):
-            return None
-        return response[0].text
+            if response and response[0] is not None and response[0].text:
+                return response[0].text
+            logging.warning(f"{self.__class__.__name__} # Empty response from {model.name}")
+        return None
 
     def _format_tools_for_analysis(self) -> str:
         """Format the tools from YAML config for analysis by red team model"""
@@ -551,27 +551,32 @@ class AgentBreaker(garak.probes.IterativeProbe):
             tools_description=tools_description,
         )
 
-        analysis = self._get_model_response(analysis_prompt)
-
-        # Parse the JSON response
         result = {
-            "raw_analysis": analysis,
+            "raw_analysis": None,
             "agent_purpose": agent_purpose,
             "tools": self.agent_config.get("tools", []),
             "tool_analyses": {},
             "priority_targets": [],
         }
 
-        if analysis:
+        # A long analysis can stop at the token limit with the JSON cut; without
+        # it nothing is attacked, so ask once more
+        for _ in range(2):
+            analysis = self._get_model_response(analysis_prompt)
+            result["raw_analysis"] = analysis
+            if not analysis:
+                continue
             try:
                 parsed = self._detector._extract_json(analysis)
-                result["tool_analyses"] = parsed.get("tool_analyses", {})
-                result["priority_targets"] = parsed.get("priority_targets", [])
             except json.JSONDecodeError as e:
                 logging.warning(
                     f"{self.__class__.__name__} # Failed to parse JSON response: {e}"
                 )
                 logging.debug(f"Raw response: {analysis}")
+                continue
+            result["tool_analyses"] = parsed.get("tool_analyses", {})
+            result["priority_targets"] = parsed.get("priority_targets", [])
+            break
 
         logging.debug(
             f"{self.__class__.__name__} # Analyzed {len(result['tool_analyses'])} tools, "

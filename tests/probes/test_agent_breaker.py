@@ -1176,3 +1176,32 @@ class TestAttackStateRoundTrip:
         notes = state.to_notes()
         assert notes["verified_results"] == [(True, 0.9), (False, 0.1)]
         assert notes["current_attack_prompt"] == "updated prompt"
+
+
+# ===========================================================================
+# Attacker answer empty or cut
+# ===========================================================================
+
+
+class TestAttackerRetry:
+
+    def test_empty_answer_is_asked_again(self):
+        probe = _make_probe()
+        probe.red_team_model = MagicMock()
+        probe.red_team_model.generate.side_effect = [
+            [garak.attempt.Message("")],
+            [garak.attempt.Message("ok")],
+        ]
+        assert probe._get_model_response("analyse") == "ok"
+
+    def test_cut_analysis_is_asked_again(self):
+        # a reasoning model at its token limit cuts the JSON; without a second
+        # try no tool is attacked
+        probe = _make_probe()
+        answers = [
+            '{"tool_analyses": {"file_reader": {"attack_prompts": ["x"',
+            '{"tool_analyses": {"file_reader": {"attack_prompts": ["x"]}}}',
+        ]
+        with patch.object(probe, "_get_model_response", side_effect=answers):
+            result = probe._analyze_attackable_tools()
+        assert list(result["tool_analyses"]) == ["file_reader"]
