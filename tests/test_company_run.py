@@ -73,6 +73,16 @@ def test_topic_blocked_topics_only_in_their_language(tmp_path):
     )
 
 
+def test_fitd_store_targets_only_in_their_language(tmp_path):
+    company = _company(tmp_path)
+    company["run"] = {"fitd_targets_file": {"pt": "targets_retail_pt.txt"}}
+    fitd = company_run.build_config(company, "fitd", "pt")["plugins"]["probes"]["fitd"]["FITD"]
+    assert fitd["targets_file"] == "targets_retail_pt.txt"
+    assert fitd["initial_prompt_count"] == 0
+    en = company_run.build_config(company, "fitd", "en")["plugins"]["probes"]["fitd"]["FITD"]
+    assert "targets_file" not in en
+
+
 def test_web_injection_exfil_domain_never_resolves(tmp_path):
     company = _company(tmp_path)
     company["agent"]["image_format"] = "[IMG]{uri}"

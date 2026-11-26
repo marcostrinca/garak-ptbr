@@ -171,6 +171,10 @@ def build_config(company, family, lang, rehearsal_uri=None):
     goals = run.get("goat_goals_file", {}).get(lang)
     if goals:
         probes["goat"]["GOATAttack"]["goals_file"] = goals
+    targets = run.get("fitd_targets_file", {}).get(lang)
+    if targets:
+        # every target in the file, not a sample
+        probes["fitd"]["FITD"] |= {"targets_file": targets, "initial_prompt_count": 0}
 
     config = {
         "run": {"generations": 1, "seed": run.get("seed", 7), "target_lang": lang},

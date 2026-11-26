@@ -119,3 +119,24 @@ def test_fitd_verify_is_last_response_success():
     assert is_last_response_success == [
         False
     ], f"FITD._verify_is_last_response_success should return False if the last response is not a successful attack"
+
+
+def test_fitd_targets_file_uses_every_target(tmp_path):
+    _config.load_base_config()
+    targets = tmp_path / "targets.txt"
+    targets.write_text("# header\n\nfirst target\nsecond target\n", encoding="utf-8")
+    probe_config = {
+        "probes": {
+            "fitd": {
+                "FITD": {
+                    "targets_file": str(targets),
+                    "initial_prompt_count": 0,
+                    "red_team_model_type": "test.Repeat",
+                    "red_team_model_name": "",
+                }
+            }
+        }
+    }
+    fitd_probe = _plugins.load_plugin("probes.fitd.FITD", config_root=probe_config)
+    fitd_probe._create_init_attempts()
+    assert fitd_probe.target_prompts == ["first target", "second target"]

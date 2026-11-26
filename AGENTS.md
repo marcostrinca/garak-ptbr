@@ -91,6 +91,10 @@ smuggling.HomoglyphObfuscation, sata.MLM, dra, goodside.Tag, latentinjection.
   realinhamento de `prompt_template_realign_<lang>.txt`, palavras sensíveis de `sensitive_words_<lang>.csv`. Recusa
   vista por `ptbr.MitigationBypass` em pt. Com resposta em pt, a parada (`verify` ou `detector`) usa o juiz pt
   (`detector_for_run`), o mesmo da nota, como no goat; o juiz `aligned` do atacante (decide o realinhamento) segue em inglês.
+  `targets_file` (caminho ou nome em `data/fitd`) troca os objetivos do harmbench por um alvo por linha (pula linha
+  vazia e `#`); `initial_prompt_count` 0 usa todos. `targets_retail_pt.txt` = 13 pedidos de loja (remédio, cupom, frete,
+  dado de cliente, cartão, sacola, ofensa, prompt). Os do harmbench fogem do tema de um agente de loja: ele recusa no
+  1º turno e a conversa nem escala. O alvo da sacola pode mexer na sacola de um agente com ferramenta de compra.
 - topic: WordNet, frases-modelo e temas padrão seguem `run.target_lang` (`topic.LANGS`); em pt, OpenWN-PT
   (`omw-pt:1.4`) com as relações do WordNet 3.0 (`lexicon_expand: omw-en:1.4`), 43.895 conceitos contra 117.659 do
   inglês, com grafia de Portugal em parte. Sem tradução na hora. `notes["attack_goal"]` leva os temas para o juiz.
