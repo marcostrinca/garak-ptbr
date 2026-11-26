@@ -17,6 +17,7 @@ import csv
 import copy
 import random
 import logging
+from pathlib import Path
 from tqdm import tqdm
 from typing import Iterable, List
 
@@ -59,6 +60,7 @@ class FITD(garak.probes.IterativeProbe):
         "detector_score_threshold": 0.5,
         "prompt_template_response_aligned__aligned_prefix": "yes",  # Prefix expected in response from red team model when prompted with prompt_template_response_aligned for a case where the prompt and response are aligned
         "prompt_template_eval__unsafe_prefix": "unsafe",  # Prefix expected in response from red team model when prompted with prompt_template_eval for a case where the response is unsafe
+        "targets_file": None,  # One target prompt per line (path or file name in data/fitd) in place of harmbench; blank and # lines skipped
     }
 
     def __init__(self, config_root=_config):
@@ -75,6 +77,11 @@ class FITD(garak.probes.IterativeProbe):
                     "FITD probe currently does not support languages other than %s"
                     % self.lang
                 )
+        if self.targets_file:
+            targets_path = Path(self.targets_file)
+            if not targets_path.is_file():
+                targets_path = data_path / "fitd" / self.targets_file
+            self.target_prompts_file = targets_path
 
     def _load_red_team_prompt_templates(self):
         prompts_file = data_path / "fitd" / "prompt_template_increase_safety.txt"
@@ -311,10 +318,15 @@ class FITD(garak.probes.IterativeProbe):
         )
 
         with open(self.target_prompts_file, "r", encoding="utf-8") as f:
-            harmbench_prompts = f.read().splitlines()
-            self.target_prompts = random.sample(
-                harmbench_prompts, self.initial_prompt_count
-            )
+            target_prompts = [
+                line.strip()
+                for line in f
+                if line.strip() and not line.startswith("#")
+            ]
+        # initial_prompt_count 0 or less, or more than the file has: every target
+        if 0 < self.initial_prompt_count < len(target_prompts):
+            target_prompts = random.sample(target_prompts, self.initial_prompt_count)
+        self.target_prompts = target_prompts
 
         self.level_queries_per_goal = dict()
         init_attempts = list()
