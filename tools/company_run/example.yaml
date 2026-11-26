@@ -52,6 +52,7 @@ run:
     phrasing: [pt, en]
     web_injection: [pt, en]
   goat_goals_file: {en: goals_retail_en.txt}
+  fitd_targets_file: {pt: targets_retail_pt.txt}
   report_dir: /home/me/garak-companies/reports
 
 # optional: model for attackers, judges and translator (default DeepSeek-V4.1-Flash on together.ai)

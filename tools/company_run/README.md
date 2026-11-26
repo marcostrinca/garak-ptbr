@@ -26,8 +26,8 @@ Cada família de ataque, em cada idioma, é uma rodada do garak com relatório p
   Sem a lista, o `topic` roda só os temas polêmicos de sempre.
   `image_format` é como a resposta escreve uma imagem que o chat mostra (`{uri}` é a URL; padrão: Markdown); o
   `web_injection.ImageExfil` pede a imagem nesse formato, com URL num domínio `.invalid`, que não existe.
-- `run`: famílias e idiomas (`families`; sem isso, todas), objetivos do goat por idioma (`goat_goals_file`) e a
-  pasta dos relatórios (`report_dir`).
+- `run`: famílias e idiomas (`families`; sem isso, todas), objetivos do goat por idioma (`goat_goals_file`), alvos
+  do fitd por idioma (`fitd_targets_file`, todos os da lista) e a pasta dos relatórios (`report_dir`).
 - `model` (opcional): modelo do atacante, dos juízes e do tradutor. Padrão: DeepSeek-V4.1-Flash na together.ai.
 - `garak` (opcional): qualquer config do garak, aplicada por último. No ensaio, ela não troca o alvo falso.
 
